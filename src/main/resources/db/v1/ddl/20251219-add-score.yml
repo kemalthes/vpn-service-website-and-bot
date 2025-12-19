@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-score
+      author: kemalthes
+      changes:
+        - addColumn:
+            tableName: comments
+            columns:
+              - column:
+                  name: score
+                  type: integer
+                  constraints:
+                    nullable: false

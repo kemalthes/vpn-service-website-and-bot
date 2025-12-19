@@ -1,0 +1,351 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0
+      author: kemalthes
+      changes:
+        - sql:
+            sql: CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+  - changeSet:
+      id: 1
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  defaultValueComputed: gen_random_uuid()
+              - column:
+                  name: name
+                  type: varchar(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: password
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: createdAt
+                  type: timestamp
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: users
+            columnNames: id
+            constraintName: pk_users
+        - sql:
+            sql: ALTER TABLE users ADD CONSTRAINT ch_role CHECK (role in ('user', 'admin'));
+
+  - changeSet:
+      id: 2
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: tokens
+            columns:
+              - column:
+                  name: id
+                  type: bigserial
+              - column:
+                  name: token
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: createdAt
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: validTo
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: userId
+                  type: uuid
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: tokens
+            columnNames: id
+            constraintName: pk_tokens
+        - addForeignKeyConstraint:
+            baseTableName: tokens
+            baseColumnNames: userId
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: fk_tokens_user
+        - createIndex:
+            tableName: tokens
+            indexName: idx_tokens_userId
+            columns:
+              - column:
+                  name: userId
+        - sql:
+            sql: ALTER TABLE tokens ADD CONSTRAINT ch_tokens_status CHECK (status in ('active', 'revoked', 'expired'));
+
+  - changeSet:
+      id: 3
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: comments
+            columns:
+              - column:
+                  name: id
+                  type: bigserial
+                  constraints:
+                    nullable: false
+              - column:
+                  name: text
+                  type: varchar(2048)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: userId
+                  type: uuid
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: comments
+            columnNames: id
+            constraintName: pk_comments
+        - addForeignKeyConstraint:
+            baseTableName: comments
+            baseColumnNames: userId
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: fk_comments_user
+        - createIndex:
+            tableName: comments
+            indexName: idx_comments_userId
+            columns:
+              - column:
+                  name: userId
+
+  - changeSet:
+      id: 4
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: logs
+            columns:
+              - column:
+                  name: id
+                  type: bigserial
+                  constraints:
+                    nullable: false
+              - column:
+                  name: userId
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: action
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: varchar(2048)
+        - addPrimaryKey:
+            tableName: logs
+            columnNames: id
+            constraintName: pk_logs
+        - addForeignKeyConstraint:
+            baseTableName: logs
+            baseColumnNames: userId
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: fk_logs_user
+        - createIndex:
+            tableName: logs
+            indexName: idx_logs_userId
+            columns:
+              - column:
+                  name: userId
+
+  - changeSet:
+      id: 5
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: id
+                  type: bigserial
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: price
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: duration
+                  type: integer
+                  constraints:
+                    nullable: false
+              - column:
+                  name: country
+                  type: varchar(128)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: vpn_plans
+            columnNames: id
+            constraintName: pk_vpn_plans
+
+  - changeSet:
+      id: 6
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: orders
+            columns:
+              - column:
+                  name: id
+                  type: bigserial
+                  constraints:
+                    nullable: false
+              - column:
+                  name: userId
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: vpnPlanId
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: createdAt
+                  type: timestamp
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: orders
+            columnNames: id
+            constraintName: pk_orders
+        - addForeignKeyConstraint:
+            baseTableName: orders
+            baseColumnNames: userId
+            referencedTableName: users
+            referencedColumnNames: id
+            constraintName: fk_orders_user
+        - addForeignKeyConstraint:
+            baseTableName: orders
+            baseColumnNames: vpnPlanId
+            referencedTableName: vpn_plans
+            referencedColumnNames: id
+            constraintName: fk_orders_vpnplan
+        - createIndex:
+            tableName: orders
+            indexName: idx_orders_userId
+            columns:
+              - column:
+                  name: userId
+        - createIndex:
+            tableName: orders
+            indexName: idx_orders_vpnPlanId
+            columns:
+              - column:
+                  name: vpnPlanId
+        - sql:
+            sql: ALTER TABLE orders ADD CONSTRAINT ch_orders_status CHECK (status in ('pending', 'paid', 'cancelled'));
+
+  - changeSet:
+      id: 7
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: payments
+            columns:
+              - column:
+                  name: id
+                  type: bigserial
+                  constraints:
+                    nullable: false
+              - column:
+                  name: orderId
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: amount
+                  type: numeric(12,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: paymentDate
+                  type: timestamp
+                  constraints:
+                    nullable: false
+              - column:
+                  name: method
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: transactionToken
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: currency
+                  type: varchar(16)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            tableName: payments
+            columnNames: id
+            constraintName: pk_payments
+        - addForeignKeyConstraint:
+            baseTableName: payments
+            baseColumnNames: orderId
+            referencedTableName: orders
+            referencedColumnNames: id
+            constraintName: fk_payments_order
+        - createIndex:
+            tableName: payments
+            indexName: idx_payments_orderId
+            columns:
+              - column:
+                  name: orderId
+        - sql:
+            sql: ALTER TABLE payments ADD CONSTRAINT ch_payments_status CHECK (status in ('pending', 'success', 'failed'));

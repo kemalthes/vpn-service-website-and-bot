@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: ddl/20251122-init.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20251219-add-score.yml
+      relativeToChangelogFile: true
