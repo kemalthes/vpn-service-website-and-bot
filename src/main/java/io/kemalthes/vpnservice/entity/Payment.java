@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Table("payments")
 public class Payment {
     @Id
-    private String id;
+    private Integer id;
     private String orderId;
     private BigDecimal amount;
     private String status;

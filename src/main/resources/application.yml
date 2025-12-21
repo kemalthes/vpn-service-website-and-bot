@@ -2,6 +2,7 @@ spring:
   application:
     name: VPN-Service
   liquibase:
+    enabled: false
     change-log: classpath:db/changelog-master.xml
   datasource:
     url: ${DB_URL}
@@ -10,3 +11,11 @@ spring:
       driver-class-name: org.postgresql.Driver
       password: ${DB_PASSWORD}
       jdbc-url: ${DB_URL}
+  cache:
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=60m
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true

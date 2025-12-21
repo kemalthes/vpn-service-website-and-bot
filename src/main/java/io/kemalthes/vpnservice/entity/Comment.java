@@ -4,12 +4,16 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 @Data
 @Table("comments")
 public class Comment {
     @Id
-    private String id;
+    private Integer id;
     private String text;
     private Integer score;
-    private String userId;
+    private UUID userId;
+    private LocalDateTime createdAt;
 }

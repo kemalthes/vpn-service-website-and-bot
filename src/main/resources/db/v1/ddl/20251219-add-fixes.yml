@@ -1,0 +1,191 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-score
+      author: kemalthes
+      preConditions:
+        - onFail:
+            MARK_RAN
+        - not:
+            - columnExists:
+                tableName: comments
+                columnName: score
+      changes:
+        - addColumn:
+            tableName: comments
+            columns:
+              - column:
+                  name: score
+                  type: integer
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: add-createdAt-auto
+      author: kemalthes
+      changes:
+        - addDefaultValue:
+            tableName: users
+            columnName: createdAt
+            defaultValueComputed: CURRENT_TIMESTAMP
+
+  - changeSet:
+      id: add-createdAt2-auto
+      author: kemalthes
+      changes:
+        - addDefaultValue:
+            tableName: orders
+            columnName: createdAt
+            defaultValueComputed: CURRENT_TIMESTAMP
+        - addDefaultValue:
+            tableName: payments
+            columnName: paymentDate
+            defaultValueComputed: CURRENT_TIMESTAMP
+
+  - changeSet:
+      id: rename-columns-snake-case
+      author: kemalthes
+      changes:
+        - renameColumn:
+            tableName: users
+            oldColumnName: createdAt
+            newColumnName: created_at
+        - renameColumn:
+            tableName: tokens
+            oldColumnName: createdAt
+            newColumnName: created_at
+        - renameColumn:
+            tableName: orders
+            oldColumnName: createdAt
+            newColumnName: created_at
+        - renameColumn:
+            tableName: payments
+            oldColumnName: paymentDate
+            newColumnName: payment_date
+
+  - changeSet:
+      id: add-timestamps-defaults
+      author: kemalthes
+      changes:
+        - addDefaultValue:
+            tableName: users
+            columnName: created_at
+            defaultValueComputed: CURRENT_TIMESTAMP
+        - addDefaultValue:
+            tableName: tokens
+            columnName: created_at
+            defaultValueComputed: CURRENT_TIMESTAMP
+        - addColumn:
+            tableName: comments
+            columns:
+              - column:
+                  name: created_at
+                  type: timestamp
+        - addDefaultValue:
+            tableName: comments
+            columnName: created_at
+            defaultValueComputed: CURRENT_TIMESTAMP
+        - addColumn:
+            tableName: logs
+            columns:
+              - column:
+                  name: created_at
+                  type: timestamp
+        - addDefaultValue:
+            tableName: logs
+            columnName: created_at
+            defaultValueComputed: CURRENT_TIMESTAMP
+        - addDefaultValue:
+            tableName: orders
+            columnName: created_at
+            defaultValueComputed: CURRENT_TIMESTAMP
+        - addDefaultValue:
+            tableName: payments
+            columnName: payment_date
+            defaultValueComputed: CURRENT_TIMESTAMP
+
+  - changeSet:
+      id: 10-rename-fk-columns
+      author: kemalthes
+      changes:
+        - renameColumn:
+            tableName: tokens
+            oldColumnName: userId
+            newColumnName: user_id
+        - renameColumn:
+            tableName: comments
+            oldColumnName: userId
+            newColumnName: user_id
+        - renameColumn:
+            tableName: logs
+            oldColumnName: userId
+            newColumnName: user_id
+        - renameColumn:
+            tableName: orders
+            oldColumnName: userId
+            newColumnName: user_id
+        - renameColumn:
+            tableName: orders
+            oldColumnName: vpnPlanId
+            newColumnName: vpn_plan_id
+        - renameColumn:
+            tableName: payments
+            oldColumnName: orderId
+            newColumnName: order_id
+
+  - changeSet:
+      id: fix-indexes
+      author: kemalthes
+      changes:
+        - dropIndex:
+            tableName: tokens
+            indexName: idx_tokens_userId
+        - createIndex:
+            tableName: tokens
+            indexName: idx_tokens_user_id
+            columns:
+              - column:
+                  name: user_id
+        - dropIndex:
+            tableName: comments
+            indexName: idx_comments_userId
+        - createIndex:
+            tableName: comments
+            indexName: idx_comments_user_id
+            columns:
+              - column:
+                  name: user_id
+        - dropIndex:
+            tableName: logs
+            indexName: idx_logs_userId
+        - createIndex:
+            tableName: logs
+            indexName: idx_logs_user_id
+            columns:
+              - column:
+                  name: user_id
+        - dropIndex:
+            tableName: orders
+            indexName: idx_orders_userId
+        - createIndex:
+            tableName: orders
+            indexName: idx_orders_user_id
+            columns:
+              - column:
+                  name: user_id
+        - dropIndex:
+            tableName: orders
+            indexName: idx_orders_vpnPlanId
+        - createIndex:
+            tableName: orders
+            indexName: idx_orders_vpn_plan_id
+            columns:
+              - column:
+                  name: vpn_plan_id
+        - dropIndex:
+            tableName: payments
+            indexName: idx_payments_orderId
+        - createIndex:
+            tableName: payments
+            indexName: idx_payments_order_id
+            columns:
+              - column:
+                  name: order_id

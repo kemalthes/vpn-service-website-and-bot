@@ -3,5 +3,5 @@ databaseChangeLog:
       file: ddl/20251122-init.yml
       relativeToChangelogFile: true
   - include:
-      file: ddl/20251219-add-score.yml
+      file: ddl/20251219-add-fixes.yml
       relativeToChangelogFile: true

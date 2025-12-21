@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 @Table("vpn_plans")
 public class VpnPlan {
     @Id
-    private String id;
+    private Integer id;
     private String name;
     private BigDecimal price;
     private Integer duration;
