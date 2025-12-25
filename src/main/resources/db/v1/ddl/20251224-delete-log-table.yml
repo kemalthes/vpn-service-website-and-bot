@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: delete-log-table
+      author: kemalthes
+      changes:
+        - dropTable:
+            tableName: logs

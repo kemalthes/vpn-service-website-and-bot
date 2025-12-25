@@ -5,3 +5,6 @@ databaseChangeLog:
   - include:
       file: ddl/20251219-add-fixes.yml
       relativeToChangelogFile: true
+  - include:
+      file: ddl/20251224-delete-log-table.yml
+      relativeToChangelogFile: true

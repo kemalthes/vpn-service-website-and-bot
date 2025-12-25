@@ -9,7 +9,9 @@ public class ErrorResponse {
 
     private String exceptionClassName;
 
-    private Integer code;
+    private Integer status;
 
     private String message;
+
+    private String path;
 }

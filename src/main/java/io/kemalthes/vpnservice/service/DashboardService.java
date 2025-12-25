@@ -31,7 +31,6 @@ public class DashboardService {
 
     @Cacheable(value = "dashboard")
     public DashboardResponse getDashboard() {
-        log.info("Dashboard service called");
         return DashboardResponse.builder()
                 .totalUsers(userRepository.count())
                 .averageScore(commentRepository.getAverageScore() == null ? 0 : commentRepository.getAverageScore())
@@ -45,7 +44,6 @@ public class DashboardService {
 
     @Cacheable(value = "vpnPlans")
     public List<VpnPlanResponse> getPlans() {
-        log.info("VpnPlansService called");
         return vpnPlanMapper.toDtoList(vpnPlanRepository.findAll());
     }
 }
