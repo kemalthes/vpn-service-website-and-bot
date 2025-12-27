@@ -1,0 +1,256 @@
+databaseChangeLog:
+  - changeSet:
+      id: insert-vpn-plans
+      author: kemalthes
+      changes:
+        - insert:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: id
+                  value: '1'
+              - column:
+                  name: name
+                  value: "1 месяц"
+              - column:
+                  name: price
+                  value: '299'
+              - column:
+                  name: duration
+                  value: '30'
+              - column:
+                  name: country
+                  value: "Netherlands"
+        - insert:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: id
+                  value: '2'
+              - column:
+                  name: name
+                  value: "6 месяцев"
+              - column:
+                  name: price
+                  value: '1194'
+              - column:
+                  name: duration
+                  value: '180'
+              - column:
+                  name: country
+                  value: "Netherlands"
+        - insert:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: id
+                  value: '3'
+              - column:
+                  name: name
+                  value: "12 месяцев"
+              - column:
+                  name: price
+                  value: '1788'
+              - column:
+                  name: duration
+                  value: '360'
+              - column:
+                  name: country
+                  value: "Netherlands"
+
+  - changeSet:
+      id: insert-vpn-plan-features
+      author: kemalthes
+      changes:
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '1'
+              - column:
+                  name: feature_key
+                  value: "traffic_unlimited"
+              - column:
+                  name: value
+                  value: "Безлимитный трафик"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '1'
+              - column:
+                  name: feature_key
+                  value: "all_servers"
+              - column:
+                  name: value
+                  value: "Все серверы доступны"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '1'
+              - column:
+                  name: feature_key
+                  value: "support_24_7"
+              - column:
+                  name: value
+                  value: "24/7 поддержка"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '1'
+              - column:
+                  name: feature_key
+                  value: "no_logs"
+              - column:
+                  name: value
+                  value: "Без логов"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '1'
+              - column:
+                  name: feature_key
+                  value: "devices_limit"
+              - column:
+                  name: value
+                  value: "До 5 устройств"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '2'
+              - column:
+                  name: feature_key
+                  value: "traffic_unlimited"
+              - column:
+                  name: value
+                  value: "Безлимитный трафик"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '2'
+              - column:
+                  name: feature_key
+                  value: "all_servers"
+              - column:
+                  name: value
+                  value: "Все серверы доступны"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '2'
+              - column:
+                  name: feature_key
+                  value: "support_24_7"
+              - column:
+                  name: value
+                  value: "24/7 поддержка"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '2'
+              - column:
+                  name: feature_key
+                  value: "no_logs"
+              - column:
+                  name: value
+                  value: "Без логов"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '2'
+              - column:
+                  name: feature_key
+                  value: "devices_limit"
+              - column:
+                  name: value
+                  value: "До 10 устройств"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '3'
+              - column:
+                  name: feature_key
+                  value: "traffic_unlimited"
+              - column:
+                  name: value
+                  value: "Безлимитный трафик"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '3'
+              - column:
+                  name: feature_key
+                  value: "all_servers"
+              - column:
+                  name: value
+                  value: "Все серверы доступны"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '3'
+              - column:
+                  name: feature_key
+                  value: "support_24_7"
+              - column:
+                  name: value
+                  value: "24/7 поддержка"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '3'
+              - column:
+                  name: feature_key
+                  value: "no_logs"
+              - column:
+                  name: value
+                  value: "Без логов"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '3'
+              - column:
+                  name: feature_key
+                  value: "devices_unlimited"
+              - column:
+                  name: value
+                  value: "Безлимит устройств"
+        - insert:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  value: '3'
+              - column:
+                  name: feature_key
+                  value: "cheap_price"
+              - column:
+                  name: value
+                  value: "Дешевая цена"

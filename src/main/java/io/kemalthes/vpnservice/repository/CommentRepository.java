@@ -1,5 +1,6 @@
 package io.kemalthes.vpnservice.repository;
 
+import io.kemalthes.vpnservice.dto.CommentResponse;
 import io.kemalthes.vpnservice.entity.Comment;
 import org.springframework.data.jdbc.repository.query.Query;
 import org.springframework.data.repository.CrudRepository;
@@ -13,12 +14,17 @@ public interface CommentRepository extends CrudRepository<Comment, Integer> {
     Double getAverageScore();
 
     @Query("""
-        select * from comments
+        select c.text,
+               c.score,
+               u.id as user_id,
+               u.name as user_name
+        from comments c
+        join users u on user_id = u.id
         where score > :minScore and length(text) > :minLength
         order by random()
         limit :limit
         """)
-    List<Comment> getRandomCommentsByScoreAndTextLength(
+    List<CommentResponse> findRandomComments(
             @Param("minScore") double minScore,
             @Param("minLength") int minLength,
             @Param("limit") int limit

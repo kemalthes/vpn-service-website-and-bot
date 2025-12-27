@@ -2,7 +2,6 @@ package io.kemalthes.vpnservice.service;
 
 import io.kemalthes.vpnservice.dto.DashboardResponse;
 import io.kemalthes.vpnservice.dto.VpnPlanResponse;
-import io.kemalthes.vpnservice.mapper.CommentMapper;
 import io.kemalthes.vpnservice.mapper.VpnPlanMapper;
 import io.kemalthes.vpnservice.repository.CommentRepository;
 import io.kemalthes.vpnservice.repository.OrderRepository;
@@ -15,6 +14,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -27,18 +27,16 @@ public class DashboardService {
     private final OrderRepository orderRepository;
     private final VpnPlanRepository vpnPlanRepository;
     private final VpnPlanMapper vpnPlanMapper;
-    private final CommentMapper commentMapper;
 
     @Cacheable(value = "dashboard")
     public DashboardResponse getDashboard() {
         return DashboardResponse.builder()
                 .totalUsers(userRepository.count())
-                .averageScore(commentRepository.getAverageScore() == null ? 0 : commentRepository.getAverageScore())
+                .averageScore(Optional.ofNullable(commentRepository.getAverageScore()).orElse(0.))
                 .activeSubscriptions(tokenRepository.countAllByStatus("active"))
                 .totalOrders(orderRepository.count())
-                .featuredComments(commentMapper.toDtoList(
-                        commentRepository.getRandomCommentsByScoreAndTextLength(
-                                4.5, 10, 5)))
+                .featuredComments(
+                        commentRepository.findRandomComments(4.5, 10, 5))
                 .build();
     }
 

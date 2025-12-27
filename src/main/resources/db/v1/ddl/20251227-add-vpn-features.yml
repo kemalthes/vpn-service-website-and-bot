@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-vpn-features
+      author: kemalthes
+      changes:
+        - createTable:
+            tableName: vpn_plan_features
+            columns:
+              - column:
+                  name: vpn_plan_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: feature_key
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: value
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+        - addPrimaryKey:
+            constraintName: pk_vpn_plan_features
+            tableName: vpn_plan_features
+            columnNames: vpn_plan_id, feature_key
+        - addForeignKeyConstraint:
+            constraintName: fk_vpn_features_vpn_plans
+            baseTableName: vpn_plan_features
+            baseColumnNames: vpn_plan_id
+            referencedTableName: vpn_plans
+            referencedColumnNames: id
+            onDelete: CASCADE

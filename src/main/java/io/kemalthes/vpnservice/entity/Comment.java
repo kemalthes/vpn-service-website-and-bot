@@ -10,10 +10,15 @@ import java.util.UUID;
 @Data
 @Table("comments")
 public class Comment {
+
     @Id
     private Integer id;
+
     private String text;
+
     private Integer score;
+
     private UUID userId;
+
     private LocalDateTime createdAt;
 }

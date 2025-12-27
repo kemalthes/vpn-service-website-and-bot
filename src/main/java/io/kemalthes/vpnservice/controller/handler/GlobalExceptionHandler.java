@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleAny(Exception ex, HttpServletRequest request) {
+    public ResponseEntity<ExceptionResponse> handleAny(Exception ex, HttpServletRequest request) {
         log.error("Unhandled {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
-        ErrorResponse body = ErrorResponse.builder()
+        ExceptionResponse body = ExceptionResponse.builder()
                 .exceptionClassName(ex.getClass().getName())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .message("Internal Server Error. UnexpectedError")

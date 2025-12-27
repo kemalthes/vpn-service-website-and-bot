@@ -15,4 +15,5 @@ public class CommentResponse {
 
     private UUID userId;
 
+    private String userName;
 }

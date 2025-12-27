@@ -23,3 +23,5 @@ springdoc:
     enabled: true
 logging:
   config: classpath:logback-spring.xml
+project:
+  originPattern: ${ORIGIN_PATTERN}
