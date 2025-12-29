@@ -2,6 +2,7 @@ package io.kemalthes.vpnservice.service;
 
 import io.kemalthes.vpnservice.dto.DashboardResponse;
 import io.kemalthes.vpnservice.dto.VpnPlanResponse;
+import io.kemalthes.vpnservice.enums.TokenStatus;
 import io.kemalthes.vpnservice.mapper.VpnPlanMapper;
 import io.kemalthes.vpnservice.repository.CommentRepository;
 import io.kemalthes.vpnservice.repository.OrderRepository;
@@ -10,6 +11,7 @@ import io.kemalthes.vpnservice.repository.UserRepository;
 import io.kemalthes.vpnservice.repository.VpnPlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -28,15 +30,23 @@ public class DashboardService {
     private final VpnPlanRepository vpnPlanRepository;
     private final VpnPlanMapper vpnPlanMapper;
 
+    @Value("${project.dashboard-comment.min-score}")
+    private double minScore;
+    @Value("${project.dashboard-comment.min-length}")
+    private int minLength;
+    @Value("${project.dashboard-comment.limit}")
+    private int limit;
+
     @Cacheable(value = "dashboard")
     public DashboardResponse getDashboard() {
         return DashboardResponse.builder()
                 .totalUsers(userRepository.count())
                 .averageScore(Optional.ofNullable(commentRepository.getAverageScore()).orElse(0.))
-                .activeSubscriptions(tokenRepository.countAllByStatus("active"))
+                .activeSubscriptions(tokenRepository.countAllByStatus(
+                        TokenStatus.ACTIVE.name().toLowerCase()))
                 .totalOrders(orderRepository.count())
                 .featuredComments(
-                        commentRepository.findRandomComments(4.5, 10, 5))
+                        commentRepository.findRandomComments(minScore, minLength, limit))
                 .build();
     }
 

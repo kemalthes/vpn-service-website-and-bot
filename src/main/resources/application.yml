@@ -24,4 +24,8 @@ springdoc:
 logging:
   config: classpath:logback-spring.xml
 project:
-  originPattern: ${ORIGIN_PATTERN}
+  origin-pattern: ${ORIGIN_PATTERN}
+  dashboard-comment:
+    min-score: 4.5
+    min-length: 10
+    limit: 5

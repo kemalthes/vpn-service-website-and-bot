@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-unique-user-id
+      author: kemalthes
+      changes:
+        - addUniqueConstraint:
+            constraintName: uq_comment_user_id
+            tableName: comments
+            columnNames: user_id

@@ -11,7 +11,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${project.originPattern}")
+    @Value("${project.origin-pattern}")
     String[] pattern;
 
     @Override

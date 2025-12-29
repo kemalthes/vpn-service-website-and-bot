@@ -11,6 +11,9 @@ databaseChangeLog:
   - include:
       file: ddl/20251227-add-vpn-features.yml
       relativeToChangelogFile: true
+  - include:
+      file: 20251229-add-unique-constraint.yml
+      relativeToChangelogFile: true
 
   - include:
       file: dml/20251227-insert-vpn-plan.yml
