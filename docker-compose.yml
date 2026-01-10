@@ -1,0 +1,29 @@
+services:
+
+  app:
+    build: .
+    container_name: backend
+    depends_on:
+      - postgres
+    environment:
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_URL=${DB_URL:-jdbc:postgresql://postgres:5432/vpn_db}
+      - ORIGIN_PATTERN=${ORIGIN_PATTERN}
+    ports:
+      - "8080:8080"
+
+  postgres:
+    image: postgres:17
+    container_name: postgres17
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: vpn_db
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "15432:5432"
+
+volumes:
+  pg_data:
