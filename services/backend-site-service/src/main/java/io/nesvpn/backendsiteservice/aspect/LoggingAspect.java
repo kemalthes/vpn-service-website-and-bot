@@ -21,7 +21,7 @@ public class LoggingAspect {
         log.info("LoggingAspect bean init: {}", System.identityHashCode(this));
     }
 
-    @Pointcut("execution(* io.kemalthes.vpnservice..*(..))")
+    @Pointcut("execution(* io.nesvpn.backendsiteservice..*(..))")
     public void isPackage() {
     }
 

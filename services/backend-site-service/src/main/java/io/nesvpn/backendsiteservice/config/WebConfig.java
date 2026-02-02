@@ -20,7 +20,7 @@ public class WebConfig implements WebMvcConfigurer {
                 HandlerTypePredicate
                         .forAnnotation(RestController.class)
                 .and(HandlerTypePredicate
-                        .forBasePackage("io.kemalthes.vpnservice.controller")));
+                        .forBasePackage("io.nesvpn.backendsiteservice.controller")));
     }
 
     @Override
