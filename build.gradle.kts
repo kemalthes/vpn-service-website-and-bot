@@ -83,7 +83,7 @@ project(":subscribe-link-service") {
 
     dependencies {
         implementation(project(":rabbitmq-config"))
-        implementation(project(":db-migrations"))
+
         implementation("org.postgresql:postgresql")
     }
 
