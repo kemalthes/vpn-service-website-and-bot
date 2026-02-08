@@ -1,0 +1,16 @@
+spring:
+  rabbitmq:
+    host: ${RABBITMQ_URL:localhost}
+    username: ${RABBITMQ_USER:user}
+    port: ${RABBITMQ_PORT:5672}
+    password: ${RABBITMQ_PASS:password}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 1
+        retry:
+          enabled: true
+          multiplier: 2
+    connection-timeout: 20000
