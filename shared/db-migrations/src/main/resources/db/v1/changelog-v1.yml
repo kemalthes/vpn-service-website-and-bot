@@ -14,7 +14,12 @@ databaseChangeLog:
   - include:
       file: ddl/20251229-add-unique-constraint.yml
       relativeToChangelogFile: true
-
   - include:
       file: dml/20251227-insert-vpn-plan.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260202-add-telegram-columns.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260203-create-balance-transactions-table.yml
       relativeToChangelogFile: true

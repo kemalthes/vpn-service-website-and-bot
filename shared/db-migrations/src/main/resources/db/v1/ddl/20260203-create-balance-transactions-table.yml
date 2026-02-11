@@ -1,0 +1,91 @@
+databaseChangeLog:
+  - changeSet:
+      id: 10-create-balance-transactions
+      author: developer
+      changes:
+        - createTable:
+            tableName: balance_transactions
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: amount
+                  type: DECIMAL(10,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: balance_transactions
+            baseColumnNames: user_id
+            constraintName: fk_balance_transactions_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - createIndex:
+            tableName: balance_transactions
+            indexName: idx_balance_transactions_user_id
+            columns:
+              - column:
+                  name: user_id
+
+        - createIndex:
+            tableName: balance_transactions
+            indexName: idx_balance_transactions_created_at
+            columns:
+              - column:
+                  name: created_at
+                  descending: true
+  - changeSet:
+      id: 11-add-referral-id-to-balance-transactions
+      author: developer
+      changes:
+        - addColumn:
+            tableName: balance_transactions
+            columns:
+              - column:
+                  name: referral_id
+                  type: UUID
+                  constraints:
+                    nullable: true
+
+        - addForeignKeyConstraint:
+            baseTableName: balance_transactions
+            baseColumnNames: referral_id
+            constraintName: fk_balance_transactions_referral
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: SET NULL
+  - changeSet:
+      id: 12-rename-tokens-columns-to-snake-case
+      author: bulat
+      changes:
+        - renameColumn:
+            tableName: tokens
+            oldColumnName: validTo
+            newColumnName: valid_to
+            columnDataType: TIMESTAMP
