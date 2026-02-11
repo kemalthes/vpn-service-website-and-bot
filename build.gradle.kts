@@ -110,9 +110,11 @@ project(":subscribe-link-service") {
 
 project(":telegram-bot") {
     dependencies {
-        implementation(project(":rabbitmq-config"))
         implementation(project(":db-migrations"))
+        implementation(project(":rabbitmq-config"))
         implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+        implementation("org.telegram:telegrambots-spring-boot-starter:6.7.0")
+        runtimeOnly("org.postgresql:postgresql")
         implementation("org.telegram:telegrambots-spring-boot-starter:$telegramBotsVersion")
     }
 }

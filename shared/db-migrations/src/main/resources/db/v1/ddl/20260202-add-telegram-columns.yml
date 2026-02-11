@@ -1,0 +1,120 @@
+databaseChangeLog:
+  - changeSet:
+      id: 8-update-and-alter-columns
+      author: latnove
+      changes:
+        # 1. Убираем NOT NULL с name, email, password
+        - dropNotNullConstraint:
+            tableName: users
+            columnName: name
+            columnDataType: varchar(128)
+
+        - dropNotNullConstraint:
+            tableName: users
+            columnName: email
+            columnDataType: varchar(128)
+
+        - dropNotNullConstraint:
+            tableName: users
+            columnName: password
+            columnDataType: varchar(255)
+
+        # 2. tg_id (nullable, unique)
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: tg_id
+                  type: bigint
+                  constraints:
+                    nullable: true
+        - addUniqueConstraint:
+            tableName: users
+            columnNames: tg_id
+            constraintName: uq_users_tg_id
+
+        # 3. referral_code (nullable)
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: referral_code
+                  type: varchar(64)
+                  constraints:
+                    nullable: true
+
+        - addUniqueConstraint:
+            tableName: users
+            columnNames: referral_code
+            constraintName: uq_users_referral_code
+
+        # 4. referred_by
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: referred_by
+                  type: bigint
+                  constraints:
+                    nullable: true
+
+        # 5. balance
+        - addColumn:
+            tableName: users
+            columns:
+              - column:
+                  name: balance
+                  type: numeric(12,2)
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+
+        # 6. email UNIQUE
+        - addUniqueConstraint:
+            tableName: users
+            columnNames: email
+            constraintName: uq_users_email
+
+        # 7. CHECK: name/email/password либо все NULL, либо все NOT NULL
+        - sql:
+            sql: |
+              ALTER TABLE users
+              ADD CONSTRAINT ch_users_name_email_password
+              CHECK (
+                  (name IS NULL AND email IS NULL AND password IS NULL)
+                  OR
+                  (name IS NOT NULL AND email IS NOT NULL AND password IS NOT NULL)
+              );
+
+  - changeSet:
+      id: 9-create-telegram-users-table
+      author: latnove
+      changes:
+        - createTable:
+            tableName: telegram_users
+            columns:
+              - column:
+                  name: tg_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: state
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: previous_state
+                  type: varchar(64)
+                  constraints:
+                    nullable: true
+        - addPrimaryKey:
+            tableName: telegram_users
+            columnNames: tg_id
+            constraintName: pk_telegram_users
+        - addForeignKeyConstraint:
+            baseTableName: telegram_users
+            baseColumnNames: tg_id
+            referencedTableName: users
+            referencedColumnNames: tg_id
+            constraintName: fk_telegram_users_user

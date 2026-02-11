@@ -1,0 +1,1240 @@
+package io.nesvpn.telegrambot.handler;
+
+import io.nesvpn.telegrambot.model.*;
+import io.nesvpn.telegrambot.services.*;
+import io.nesvpn.telegrambot.services.ReferralService;
+import io.nesvpn.telegrambot.util.DisplayTelegramUsername;
+import io.nesvpn.telegrambot.util.Formatter;
+import io.nesvpn.telegrambot.util.KeyboardFactory;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class MessageHandler {
+
+    private final VpnBot vpnBot;
+    private final UserService userService;
+    private final ReferralService referralService;
+    private final TelegramUserService telegramUserService;
+    private final KeyboardFactory keyboardFactory;
+    private final BalanceService balanceService;
+    private final TokenService tokenService;
+    private final VpnPlanService vpnPlanService;
+
+    public MessageHandler(
+            UserService userService,
+            TelegramUserService telegramUserService,
+            ReferralService referralService,
+            KeyboardFactory keyboardFactory,
+            BalanceService balanceService,
+            TokenService tokenService,
+            VpnPlanService vpnPlanService,
+            @Lazy VpnBot vpnBot
+    ) {
+        this.userService = userService;
+        this.telegramUserService = telegramUserService;
+        this.referralService = referralService;
+        this.keyboardFactory = keyboardFactory;
+        this.balanceService = balanceService;
+        this.tokenService = tokenService;
+        this.vpnPlanService = vpnPlanService;
+        this.vpnBot = vpnBot;
+    }
+
+    public void handle(Message message) {
+        String text = message.getText();
+
+        if (text.startsWith("/start")) {
+            handleStart(message);
+        } else if (text.equals("/profile")) {
+            handleProfile(message);
+        } else if (text.equals("/referrals")) {
+            handleReferrals(message);
+        } else if (text.equals("/instructions")) {
+            handleInstructions(message);
+        } else if (text.equals("/balance")) {
+            handleBalance(message);
+        } else {
+            TelegramUser telegramUser = telegramUserService.findOrCreate(message.getFrom().getId());
+
+            if (telegramUser == null) {
+                deleteMessage(message.getChatId(), message.getMessageId());
+                handleStart(message);
+                return;
+            } 
+            
+            if (telegramUser.getState().equals(BotState.BALANCE_AWAITING_AMOUNT.toString())) {
+                handleAmountInput(message);
+            } else {
+                deleteMessage(message.getChatId(), message.getMessageId());
+            }
+        }
+    }
+
+    private void handleStart(Message message) {
+        String text = message.getText();
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+
+        boolean isNewUser = !userService.existsByTgId(userId);
+        User user = userService.findOrCreateByTgId(userId);
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.START);
+
+        if (isNewUser && text.length() > 7) {
+            String payload = text.substring(7);
+            User referrer = userService.findByReferralCode(payload);
+            if (referrer != null && !referrer.getTgId().equals(userId)) {
+                referralService.linkReferral(user, referrer);
+
+                String displayName = DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId());
+
+                sendMessage(referrer.getTgId(),
+                        String.format(
+                                "🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!\n" +
+                                        "💰 С его покупок вы будете получать по 20%% на баланс\n\n" +
+                                        "👤 Пользователь: %s (ID: %d)",
+                                displayName != null ? displayName : "Новый пользователь",
+                                user.getTgId()
+                        )
+                );
+            }
+        }
+
+        showStart(chatId, null, user);
+    }
+
+    private void handleProfile(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.PROFILE);
+        User user = userService.findOrCreateByTgId(userId);
+
+        showProfile(chatId, null, user);
+    }
+
+    private void handleReferrals(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.REFERRALS);
+
+        User user = userService.findOrCreateByTgId(userId);
+
+        showReferrals(chatId, null, user);
+    }
+
+    private void handleBalance(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.BALANCE);
+
+        User user = userService.findOrCreateByTgId(userId);
+
+        showBalance(chatId, null, user);
+    }
+
+    private void handleInstructions(Message message) {
+        Long chatId = message.getChatId();
+        Long userId = message.getFrom().getId();
+
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.INSTRUCTIONS);
+
+        User user = userService.findOrCreateByTgId(userId);
+        showInstructions(chatId, null, user);
+    }
+
+    public void handleAmountInput(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+        User user = userService.findOrCreateByTgId(userId);
+
+        try {
+            int amount = Integer.parseInt(message.getText().trim().replaceAll("[^0-9]", ""));
+
+            if (amount < 100) {
+                sendError(chatId, """
+                    ❌ Минимальная сумма пополнения — *100₽*
+                    
+                    Введите другую сумму:
+                    """);
+
+                showAwaitingBalance(chatId, null, user);
+                return;
+            }
+
+            if (amount > 2000) {
+                sendError(chatId, """
+                    ❌ Максимальная сумма пополнения — *2000₽*
+                    
+                    Введите другую сумму:
+                    """);
+
+                showAwaitingBalance(chatId, null, user);
+                return;
+            }
+
+            showPayment(chatId, amount, user);
+        } catch (NumberFormatException e) {
+            sendError(chatId, """
+                ❌ Неверный формат суммы
+                
+                Введите число от *100* до *2000*:"
+                """);
+
+            showAwaitingBalance(chatId, null, user);
+        }
+    }
+
+    public void checkPayment(Long chatId, Integer messageId, String transactionId, Integer amount, User user) {
+        boolean isPaid = true;
+
+        if (!isPaid) {
+            String oldText = String.format("""
+            💸 *Пополнение баланса*
+        
+            💰 Сумма: *%d ₽*
+            🆔 ID транзакции: `%s`
+        
+            ℹ️ *Инструкция:*
+            1. Нажмите кнопку "Оплатить" ниже.
+            2. Следуйте указаниям платежной системы.
+            3. После оплаты вернитесь к боту и нажмите "Проверить оплату".
+            """,
+                    amount,
+                    transactionId
+            );
+
+            String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+
+            String updatedText = oldText +  String.format("""
+        
+            ⏳ *Оплата не найдена* (%s)
+        
+            Платеж еще не поступил или обрабатывается.
+            Пожалуйста, попробуйте снова через 1-2 минуты.
+            """, currentTime);
+
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId);
+            editMessage.setMessageId(messageId);
+            editMessage.setText(updatedText);
+            editMessage.setReplyMarkup(keyboardFactory.getPaymentMenuInline(transactionId, amount));
+            editMessage.setParseMode("Markdown");
+
+            try {
+                vpnBot.execute(editMessage);
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+
+        } else {
+            balanceService.addBalance(user.getId(), new BigDecimal(amount), TransactionType.TOP_UP, "Пополнение баланса через СБП");
+
+            String successText = String.format("""
+            ✅ *Оплата подтверждена!*
+        
+            💰 Ваш баланс пополнен на *%d₽*
+            📊 Текущий баланс: *%.2f₽*
+        
+            Спасибо за использование нашего сервиса!
+            """, amount, user.getBalance().add(BigDecimal.valueOf(amount)));
+
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId);
+            editMessage.setMessageId(messageId);
+            editMessage.setText(successText);
+            editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+            editMessage.setParseMode("Markdown");
+
+            try {
+                vpnBot.execute(editMessage);
+                telegramUserService.updateState(chatId, BotState.PAYMENT_AWAITING_CONFIRMATION, BotState.BALANCE);
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void showTopUp(Long chatId, Integer messageId) {
+        telegramUserService.updateState(chatId, BotState.BALANCE_TOP_UP, BotState.BALANCE);
+
+        String text = """
+        💰 *Пополнение баланса*
+    
+        Вы хотите пополнить баланс.
+        Для этого выберите метод пополнения, а далее укажите сумму.
+    
+        Выберите способ оплаты:
+        """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getTopUpMenuInline());
+                editMessage.setParseMode("Markdown");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getTopUpMenuInline());
+                sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    public void showPayment(Long chatId, int amount, User user) {
+        telegramUserService.updateState(chatId, BotState.PAYMENT_AWAITING_CONFIRMATION, BotState.BALANCE_AWAITING_AMOUNT);
+
+        String transactionId = UUID.randomUUID().toString().substring(0, 8);
+
+        String text = String.format("""
+        💸 *Пополнение баланса*
+    
+        💰 Сумма: *%d ₽*
+        🆔 ID транзакции: `%s`
+    
+        ℹ️ *Инструкция:*
+        1. Нажмите кнопку "Оплатить" ниже.
+        2. Следуйте указаниям платежной системы.
+        3. После оплаты вернитесь к боту и нажмите "Проверить оплату".
+        """,
+                amount,
+                transactionId
+        );
+
+        try {
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(chatId.toString());
+            sendMessage.setText(text);
+            sendMessage.setReplyMarkup(keyboardFactory.getPaymentMenuInline(transactionId, amount));
+            sendMessage.setParseMode("Markdown");
+
+            vpnBot.execute(sendMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showStart(Long chatId, Integer messageId, User user) {
+        Long userId = user.getTgId();
+
+        telegramUserService.updateState(userId, BotState.START, BotState.START);
+
+        String displayName = DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId());
+
+        String text = String.format("""
+        👋 Добро пожаловать в *NesVPN*, *%s*
+        
+        🔐 *Быстрый, безопасный и стабильный VPN для обхода блокировок*
+        
+        ⚡️ *Преимущества:*
+        _• Высокая скорость соединения_
+        _• Обход белых списков_
+        _• Низкая цена_
+        _• Поддержка всех устройств_
+        _• Бесплатный тестовый период_
+        
+        _Выберите действие в меню ниже_ 👇
+        """, displayName != null ? displayName : "Дорогой друг");
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getMainMenuInline());
+                editMessage.setParseMode("Markdown");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getMainMenuInline());
+                sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showProfile(Long chatId, Integer messageId, User user) {
+        Long userId = user.getTgId();
+
+        telegramUserService.updateState(userId, BotState.PROFILE, BotState.START);
+
+        String displayName = DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId());
+
+        String referralLink = "https://t.me/" + vpnBot.getBotUsername() + "?start=" + user.getReferralCode();
+
+        String text = String.format("""
+        👤 *Ваш профиль*
+        
+        📛 _Имя:_ %s
+        💰 _Баланс:_ %.2f₽
+        👥 _Рефералов:_ %d
+        📅 _Регистрация:_ %s
+        
+        🔗 *Ваша реферальная ссылка:*
+        _%s_
+        """,
+                displayName,
+                user.getBalance(),
+                userService.getReferralsCount(user.getTgId()),
+                user.getCreatedAt() != null ? user.getCreatedAt().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) : "Не указано",
+                referralLink
+        );
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                editMessage.setParseMode("Markdown");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showReferrals(Long chatId, Integer messageId, User user) {
+        Long userId = user.getTgId();
+
+        telegramUserService.updateState(userId, BotState.REFERRALS, BotState.START);
+
+        String referralLink = "https://t.me/" + vpnBot.getBotUsername() + "?start=" + user.getReferralCode();
+
+        List<User> referrals = userService.getReferralsByReferrer(userId);
+
+        StringBuilder referralsList = new StringBuilder();
+        BigDecimal totalEarnings = BigDecimal.ZERO;
+        int referralsToShow = 15;
+        int count = 0;
+
+        for (User referral : referrals) {
+            BigDecimal earnings = referralService.getReferralEarnings(user.getId(), referral.getId());
+            totalEarnings = totalEarnings.add(earnings != null ? earnings : BigDecimal.ZERO);
+
+            if (count < referralsToShow) {
+                String referralUsername = DisplayTelegramUsername.getDisplayName(vpnBot,referral.getTgId());
+
+                String refInfo = String.format(
+                    "%d) %s (id: %d) принес %.2f₽",
+                        count + 1,
+                        referralUsername != null ? referralUsername : "no_username",
+                        referral.getTgId(),
+                        earnings != null ? earnings : BigDecimal.ZERO
+                );
+                referralsList.append(refInfo).append("\n");
+                count++;
+            }
+
+        }
+
+        if (referrals.size() > referralsToShow) {
+            referralsList.append(String.format("... и еще %d", referrals.size() - referralsToShow));
+        }
+
+        String text = String.format("""
+        <b>👥 Реферальная программа NesVPN</b>
+
+        <b>💎 Как это работает:</b>
+        • Каждый друг по вашей ссылке = <b>20%% от суммы</b> каждой покупки
+        • Деньги с покупок рефералов <b>начисляются вам на баланс</b> автоматически
+        • <b>Друг получит 50 рублей</b> на баланс
+        • <b>Нет ограничений</b> по количеству приглашенных
+
+        <b>🔗 Ваша ссылка:</b> %s
+
+        <b>📊 Статистика:</b>
+        👥 Рефералов: %d
+        💰 Ваш доход: %.2f₽
+
+        <b>📋 Ваши рефералы:</b>
+        <blockquote expandable>%s</blockquote>
+        """,
+                referralLink,
+                referrals.size(),
+                totalEarnings,
+                referrals.isEmpty() ? "Пока нет рефералов 😔" : referralsList.toString()
+        );
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setParseMode("HTML");
+                editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setParseMode("HTML");
+                sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showInstructions(Long chatId, Integer messageId, User user) {
+        Long userId = user.getTgId();
+        telegramUserService.updateState(userId, BotState.INSTRUCTIONS, BotState.START);
+
+        String text = """
+        📖 *Инструкция по подключению NesVPN*
+
+        *Общий процесс:*
+        1. Скачай VPN-клиент - Happ VPN
+        2. _Импорт crypt5_ из Telegram
+        3. Проверь _зеленый статус_ подписки
+        4. _Подключиться_ ✅
+
+        ⚠️ Иногда необходимо обновить подписку *2-3 раза*
+
+        Выберите вашу платформу для более подробной инструкции 👇
+        """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setParseMode("Markdown");
+                editMessage.setReplyMarkup(keyboardFactory.getInstructionsMenu());
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setParseMode("Markdown");
+                sendMessage.setReplyMarkup(keyboardFactory.getInstructionsMenu());
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showAndroidInstructions(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_ANDROID, BotState.INSTRUCTIONS);
+
+        String text = """
+        📱 *Android — Happ VPN*
+
+        _Шаг 1:_ Скачайте *Happ VPN* из Google Play
+        🔗 [Скачать Happ VPN](https://play.google.com/store/apps/details?id=com.happproxy)
+
+        _Шаг 2:_ Откройте Telegram → Скопируйте *ссылку на подписку*
+
+        _Шаг 3:_ Откройте *Happ VPN* → Вставьте ссылку
+
+        _Шаг 4:_ Нажмите *"Подключиться"* ✅
+
+        ⚠️ *Важно:* Иногда необходимо найти _круглую иконку обновления_ (⟳) и обновите подписку *2-3 раза* для стабильного соединения
+
+        💡 *Проблемы?*
+        • Обновите Happ VPN до последней версии
+        • Проверьте срок подписки в боте
+        • Вставьте ссылку заново
+        """;
+
+        try {
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId);
+            editMessage.setMessageId(messageId);
+            editMessage.setText(text);
+            editMessage.setParseMode("Markdown");
+            editMessage.disableWebPagePreview();
+            editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+            vpnBot.execute(editMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showIosInstructions(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_IOS, BotState.INSTRUCTIONS);
+
+        String text = """
+        🔐 *iOS — Happ VPN*
+
+        _Шаг 1:_ Скачайте *Happ VPN* из App Store
+        🔗 [Скачать Happ VPN rus](https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973)
+        🔗 [Скачать Happ VPN global](https://apps.apple.com/us/app/happ-proxy-utility/id6504287215)
+
+        _Шаг 2:_ Откройте Telegram → Скопируйте *ссылку на подписку*
+
+        _Шаг 3:_ Откройте *Happ VPN* → Вставьте ссылку
+
+        _Шаг 4:_ iOS запросит разрешение VPN → *"Разрешить"*
+
+        _Шаг 5:_ Нажмите *"Подключиться"* ✅
+
+        ⚠️ *Важно:* Иногда необходимо найти _круглую иконку обновления_ (⟳) и обновите подписку *2-3 раза* для стабильного соединения
+
+        💡 *Проблемы?*
+        • Обновите Happ VPN до последней версии
+        • Проверьте срок подписки в боте
+        • Вставьте ссылку заново
+        """;
+
+        try {
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId);
+            editMessage.setMessageId(messageId);
+            editMessage.setText(text);
+            editMessage.setParseMode("Markdown");
+            editMessage.disableWebPagePreview();
+            editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+            vpnBot.execute(editMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showWindowsInstructions(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_WINDOWS, BotState.INSTRUCTIONS);
+
+        String text = """
+        🌐 *Windows — Happ VPN*
+
+        _Шаг 1:_ Скачайте *Happ VPN* для Windows
+        🔗 [Скачать Happ VPN](https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe)
+
+        _Шаг 2:_ Откройте Telegram → Скопируйте *ссылку на подписку*
+
+        _Шаг 3:_ Откройте *Happ VPN* → Вставьте ссылку
+
+        _Шаг 4:_ Нажмите *"Подключиться"* ✅
+
+        ⚠️ *Важно:* Иногда необходимо найти _круглую иконку обновления_ (⟳) и обновите подписку *2-3 раза* для стабильного соединения
+
+        💡 *Проблемы?*
+        • Проверьте файрвол Windows
+        • Запустите от администратора
+        • Вставьте ссылку заново
+        """;
+
+        try {
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId);
+            editMessage.setMessageId(messageId);
+            editMessage.setText(text);
+            editMessage.setParseMode("Markdown");
+            editMessage.disableWebPagePreview();
+            editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+            vpnBot.execute(editMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showMacosInstructions(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_MACOS, BotState.INSTRUCTIONS);
+
+        String text = """
+        🍎 *MacOS — Happ VPN*
+
+        _Шаг 1:_ Скачайте *Happ VPN* для MacOS
+        🔗 [Скачать Happ VPN rus](https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973)
+        🔗 [Скачать Happ VPN global](https://apps.apple.com/us/app/happ-proxy-utility/id6504287215)
+
+        _Шаг 2:_ Откройте Telegram → Скопируйте *ссылку на подписку*
+
+        _Шаг 3:_ Откройте *Happ VPN* → Вставьте ссылку
+
+        _Шаг 4:_ MacOS запросит разрешение → *"Разрешить"*
+
+        _Шаг 5:_ Нажмите *"Подключиться"* ✅
+
+        ⚠️ *Важно:* Иногда необходимо найти _круглую иконку обновления_ (⟳) и обновите подписку *2-3 раза* для стабильного соединения
+
+        💡 *Проблемы?*
+        • Проверьте System Preferences → Security
+        • Вставьте ссылку заново
+        • Переустановите Happ VPN
+        """;
+
+        try {
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId);
+            editMessage.setMessageId(messageId);
+            editMessage.setText(text);
+            editMessage.setParseMode("Markdown");
+            editMessage.disableWebPagePreview();
+            editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+            vpnBot.execute(editMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showBalance(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.BALANCE, BotState.START);
+
+        String text = String.format("""
+        *💰 Ваш баланс*
+
+        💵 *Текущий баланс:* %.2f₽
+
+        _Баланс используется для:_
+        • Оплаты VPN подписок
+        • Продления активных подписок
+
+        💡 _Пополняйте баланс и получайте бонусы за рефералов!_
+
+        Выберите действие 👇
+        """,
+                user.getBalance()
+        );
+
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setParseMode("Markdown");
+                editMessage.setReplyMarkup(keyboardFactory.getBalanceMenu());
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setParseMode("Markdown");
+                sendMessage.setReplyMarkup(keyboardFactory.getBalanceMenu());
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showBalanceHistory(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.BALANCE_HISTORY, BotState.BALANCE);
+
+        List<BalanceTransaction> history = balanceService.getHistory(user.getId());
+
+        StringBuilder historyText = new StringBuilder();
+        for (BalanceTransaction tx : history) {
+            String sign = tx.getAmount().compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
+
+            historyText.append(String.format(
+                    "<b>%s %s%.2f₽</b>\n<i>%s</i>\n%s\n\n",
+                    tx.getType().getDisplayName(),
+                    sign,
+                    tx.getAmount(),
+                    tx.getDescription() != null ? tx.getDescription() : "Без описания",
+                    tx.getCreatedAt().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+            ));
+        }
+
+        String text = String.format("""
+        <b>📊 История операций</b>
+
+        Последние 20 транзакций:
+        
+        %s
+        """,
+                history.isEmpty() ? "<i>История пуста, вы не совершили ни одной транзакции</i>" : "<blockquote expandable>" + historyText.toString() + "</blockquote>"
+        );
+
+        if (text.length() > 4096) {
+            text = text.substring(0, 4090) + "\n...";
+        }
+
+        try {
+            EditMessageText editMessage = new EditMessageText();
+            editMessage.setChatId(chatId);
+            editMessage.setMessageId(messageId);
+            editMessage.setText(text);
+            editMessage.setParseMode("HTML");
+            editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+            vpnBot.execute(editMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showAwaitingBalance(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT, BotState.BALANCE_TOP_UP);
+
+        String text = """
+        💰 *Пополнение баланса*
+        
+        Введите сумму пополнения от *100₽* до *2000₽*
+        
+        Например: `500`
+        """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                editMessage.setParseMode("Markdown");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showSubscription(Long chatId, Integer messageId, User user) {
+        Long tgId = user.getTgId();
+        telegramUserService.updateState(tgId, BotState.SUBSCRIPTIONS, BotState.START);
+
+        Token token = tokenService.getUserToken(user.getId());
+        if (token == null) {
+            String text = """
+            📱 <b>Ваша подписка</b>
+            
+            У вас пока нет подписки.
+            
+            <i>💡 Обратитесь к администратору для получения подписки.</i>
+            """;
+
+            try {
+                if (messageId != null) {
+                    EditMessageText editMessage = new EditMessageText();
+                    editMessage.setChatId(chatId);
+                    editMessage.setMessageId(messageId);
+                    editMessage.setText(text.trim());
+                    editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    editMessage.setParseMode("HTML");
+                    vpnBot.execute(editMessage);
+                } else {
+                    SendMessage sendMessage = new SendMessage();
+                    sendMessage.setChatId(chatId);
+                    sendMessage.setText(text);
+                    sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    sendMessage.setParseMode("HTML");
+                    vpnBot.execute(sendMessage);
+                }
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+        } else {
+            long daysLeft = tokenService.getDaysLeft(token);
+            boolean isActive = token.isActive();
+            String tokenUrl = Formatter.getCrypt5Url(token.getToken());
+
+            String statusEmoji = isActive ? "✅" : "❌";
+            String statusText = isActive ? "Активна" : "Истекла";
+
+            String text = String.format("""
+                        📱 <b>Ваша подписка</b>
+                        
+                        %s <b>Статус:</b> %s
+                        
+                        🔗 <b>Ссылка для подключения:</b>
+                        <blockquote expandable><pre>%s</pre></blockquote>
+                        
+                        📅 <b>Действует до:</b> %s
+                        ⏳ <b>Осталось дней:</b> %d
+                        
+                        👥 <b>Устройств всего:</b> 5%s
+                        
+                        <i></i>
+                        """,
+                    statusEmoji,
+                    statusText,
+                    tokenUrl,
+                    token.getValidTo() != null
+                            ? token.getValidTo().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+                            : "Не указано",
+                    daysLeft,
+                    daysLeft <= 7 && daysLeft > 0
+                            ? "\n\n⚠️ <i>Срок подписки истекает скоро! Продлите её.</i>"
+                            : ""
+            );
+
+            try {
+                if (messageId != null) {
+                    EditMessageText editMessage = new EditMessageText();
+                    editMessage.setChatId(chatId);
+                    editMessage.setMessageId(messageId);
+                    editMessage.setText(text.trim());
+                    editMessage.setReplyMarkup(keyboardFactory.getSubscriptionKeyboard(token.getId(), tokenUrl, token.isActive()));
+                    editMessage.setParseMode("HTML");
+                    vpnBot.execute(editMessage);
+                } else {
+                    SendMessage sendMessage = new SendMessage();
+                    sendMessage.setChatId(chatId);
+                    sendMessage.setText(text);
+                    sendMessage.setReplyMarkup(keyboardFactory.getSubscriptionKeyboard(token.getId(), tokenUrl, token.isActive()));
+                    sendMessage.setParseMode("HTML");
+                    vpnBot.execute(sendMessage);
+                }
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+    public void showSubscriptionExtend(Long chatId, Integer messageId, User user) {
+        Long tgId = user.getTgId();
+        telegramUserService.updateState(tgId, BotState.SUBSCRIPTIONS_EXTEND, BotState.SUBSCRIPTIONS);
+
+        Token token = tokenService.getUserToken(user.getId());
+
+        if (token == null) {
+            String text = """
+            ❌ <b>Продление подписка</b>
+            
+            У вас нет активной подписки, вернитесь назад:
+            """;
+
+            try {
+                if (messageId != null) {
+                    EditMessageText editMessage = new EditMessageText();
+                    editMessage.setChatId(chatId);
+                    editMessage.setMessageId(messageId);
+                    editMessage.setText(text.trim());
+                    editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    editMessage.setParseMode("HTML");
+                    vpnBot.execute(editMessage);
+                } else {
+                    SendMessage sendMessage = new SendMessage();
+                    sendMessage.setChatId(chatId);
+                    sendMessage.setText(text);
+                    sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    sendMessage.setParseMode("HTML");
+                    vpnBot.execute(sendMessage);
+                }
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        long daysLeft = tokenService.getDaysLeft(token);
+
+        String text = String.format("""
+            🔄 <b>Продление подписки</b>
+            
+            💳 <b>Ваш баланс:</b> %.2f₽
+            
+            📅 <b>Текущий срок действия:</b>
+            %s
+            
+            ⏳ <b>Осталось дней:</b> %d
+            
+            💎 <b>Выберите срок продления:</b>
+            Чем дольше срок, тем выгоднее цена!
+            """,
+                user.getBalance(),
+                token.getValidTo() != null
+                        ? token.getValidTo().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+                        : "Не указано",
+                daysLeft
+        );
+
+        List<VpnPlan> plans = vpnPlanService.getAllPlans();
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text.trim());
+                editMessage.setReplyMarkup(keyboardFactory.getExtendPlansKeyboard(token.getId(), plans));
+                editMessage.setParseMode("HTML");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getExtendPlansKeyboard(token.getId(), plans));
+                sendMessage.setParseMode("HTML");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showExtendConfirm(Long chatId, Integer messageId, Long tokenId, Long planId, User user) {
+        Long tgId = user.getTgId();
+        telegramUserService.updateState(tgId, BotState.SUBSCRIPTIONS_CONFIRM, BotState.SUBSCRIPTIONS_EXTEND);
+
+        Token token = tokenService.findById(tokenId).orElse(null);
+        VpnPlan plan = vpnPlanService.findById(planId).orElse(null);
+
+        if (token == null || plan == null) {
+            String text = """
+                ❌ <b>Данные не найдены</b>
+                
+                Вернитесь назад:
+                """;
+            try {
+                if (messageId != null) {
+                    EditMessageText editMessage = new EditMessageText();
+                    editMessage.setChatId(chatId);
+                    editMessage.setMessageId(messageId);
+                    editMessage.setText(text.trim());
+                    editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    editMessage.setParseMode("HTML");
+                    vpnBot.execute(editMessage);
+                } else {
+                    SendMessage sendMessage = new SendMessage();
+                    sendMessage.setChatId(chatId);
+                    sendMessage.setText(text);
+                    sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    sendMessage.setParseMode("HTML");
+                    vpnBot.execute(sendMessage);
+                }
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        LocalDateTime currentValidTo = token.getValidTo() != null ? token.getValidTo() : LocalDateTime.now();
+
+        LocalDateTime baseDate = currentValidTo.isBefore(LocalDateTime.now())
+                ? LocalDateTime.now()
+                : currentValidTo;
+
+        LocalDateTime newValidTo = baseDate.plusDays(plan.getDuration());
+
+        String text = String.format("""
+            ✅ <b>Подтверждение тарифа</b>
+            
+            📦 <b>Тариф:</b> %s
+            💰 <b>Стоимость:</b> %d₽
+            
+            📅 <b>Текущий срок действия:</b>
+            %s
+            
+            📅 <b>После продления:</b>
+            %s
+            
+            💳 <b>Ваш баланс:</b> %.2f₽
+            
+            Подтвердите продление подписки
+            """,
+                plan.getName(),
+                plan.getPrice(),
+                currentValidTo.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")),
+                newValidTo.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")),
+                user.getBalance()
+        );
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text.trim());
+                editMessage.setReplyMarkup(keyboardFactory.getConfirmExtendKeyboard(tokenId, planId));
+                editMessage.setParseMode("HTML");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getConfirmExtendKeyboard(tokenId, planId));
+                sendMessage.setParseMode("HTML");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showExtendProcess(Long chatId, Integer messageId, Long tokenId, Long planId, User user) {
+        Long tgId = user.getTgId();
+        Token token = tokenService.findById(tokenId).orElse(null);
+        VpnPlan plan = vpnPlanService.findById(planId).orElse(null);
+
+        if (token == null || plan == null) {
+            String text = """
+                ❌ <b>Данные не найдены</b>
+                
+                Вернитесь назад:
+                """;
+            try {
+                if (messageId != null) {
+                    EditMessageText editMessage = new EditMessageText();
+                    editMessage.setChatId(chatId);
+                    editMessage.setMessageId(messageId);
+                    editMessage.setText(text.trim());
+                    editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    editMessage.setParseMode("HTML");
+                    vpnBot.execute(editMessage);
+                } else {
+                    SendMessage sendMessage = new SendMessage();
+                    sendMessage.setChatId(chatId);
+                    sendMessage.setText(text);
+                    sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                    sendMessage.setParseMode("HTML");
+                    vpnBot.execute(sendMessage);
+                }
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        if (user.getBalance().compareTo(BigDecimal.valueOf(plan.getPrice())) < 0) {
+            String text = String.format("""
+                ❌ <b>Недостаточно средств</b>
+                
+                <b>Стоимость:</b> %d₽
+                <b>Ваш баланс:</b> %.2f₽
+                
+                Пополните баланс для продления подписки.
+                """,
+                    plan.getPrice(),
+                    user.getBalance());
+
+            try {
+                if (messageId != null) {
+                    EditMessageText editMessage = new EditMessageText();
+                    editMessage.setChatId(chatId);
+                    editMessage.setMessageId(messageId);
+                    editMessage.setText(text.trim());
+                    editMessage.setReplyMarkup(keyboardFactory.getBackToSubscriptionKeyboard());
+                    editMessage.setParseMode("HTML");
+                    vpnBot.execute(editMessage);
+                } else {
+                    SendMessage sendMessage = new SendMessage();
+                    sendMessage.setChatId(chatId);
+                    sendMessage.setText(text);
+                    sendMessage.setReplyMarkup(keyboardFactory.getBackToSubscriptionKeyboard());
+                    sendMessage.setParseMode("HTML");
+                    vpnBot.execute(sendMessage);
+                }
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+            return;
+        }
+
+        String text = """
+            ⏳ <b>Подписка скоро обновится</b>
+            
+            ✅ Вы успешно оплатили подписку!
+            
+            Ожидайте в течение пару минут,
+            ваша ссылка обновится.
+            """;
+
+        balanceService.subtractBalance(user.getId(), BigDecimal.valueOf(plan.getPrice()), TransactionType.SUBSCRIPTION_PURCHASE, "Продление VPN-подписки на " + plan.getDuration() + " дней");
+
+        // TODO: Async обработка продления через API
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text.trim());
+                editMessage.setParseMode("HTML");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setParseMode("HTML");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+
+        showStart(chatId, null, user);
+
+    }
+
+    private void sendMessage(Long chatId, String text) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText(text);
+
+        try {
+            vpnBot.execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void deleteMessage(Long chatId, Integer messageId) {
+        DeleteMessage deleteMessage = new DeleteMessage();
+        deleteMessage.setChatId(chatId);
+        deleteMessage.setMessageId(messageId);
+        try {
+            vpnBot.execute(deleteMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void sendError(Long chatId, String errorText) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText(errorText);
+        message.setParseMode("Markdown");
+
+        try {
+            vpnBot.execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+}

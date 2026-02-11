@@ -1,0 +1,25 @@
+package io.nesvpn.telegrambot.repository;
+
+import io.nesvpn.telegrambot.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, String> {
+
+    Optional<User> findByTgId(Long tgId);
+
+    Optional<User> findById(UUID id);
+
+    Optional<User> findByReferralCode(String referralCode);
+
+    List<User> findAllByReferredBy(Long referredBy);
+
+    boolean existsByTgId(Long tgId);
+
+    int countByReferredBy(Long referredBy);
+}
