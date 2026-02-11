@@ -1,5 +1,6 @@
 plugins {
     java
+    `java-library`
     id("io.spring.dependency-management") version "1.1.7" apply false
     id("org.springframework.boot") version "4.0.2" apply false
 }
@@ -69,6 +70,7 @@ project(":db-migrations") {
 project(":rabbitmq-config") {
     dependencies {
         implementation("org.springframework.boot:spring-boot-starter-amqp")
+        implementation("com.fasterxml.jackson.core:jackson-databind")
     }
 }
 
@@ -104,6 +106,8 @@ project(":backend-site-service") {
 project(":subscribe-link-service") {
     dependencies {
         implementation(project(":rabbitmq-config"))
+        implementation(project(":db-migrations"))
+        implementation("org.springframework.boot:spring-boot-starter-data-jpa")
         runtimeOnly("org.postgresql:postgresql")
     }
 }

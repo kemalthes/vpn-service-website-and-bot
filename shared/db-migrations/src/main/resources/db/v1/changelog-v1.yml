@@ -24,6 +24,10 @@ databaseChangeLog:
       file: ddl/20260203-create-balance-transactions-table.yml
       relativeToChangelogFile: true
   - include:
+      file: ddl/20260902-add-vpn-user-in-tokens.yml
+      relativeToChangelogFile: true
+
+  - include:
       file: ddl/20260223-update-payments.yml
       relativeToChangelogFile: true
   - include:
