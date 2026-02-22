@@ -1,4 +1,4 @@
-package io.nesvpn.telegrambot.model;
+package io.nesvpn.telegrambot.enums;
 
 public enum BotState {
     START,
