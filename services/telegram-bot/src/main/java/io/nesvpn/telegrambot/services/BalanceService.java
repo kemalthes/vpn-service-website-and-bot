@@ -1,7 +1,7 @@
 package io.nesvpn.telegrambot.services;
 
 import io.nesvpn.telegrambot.model.BalanceTransaction;
-import io.nesvpn.telegrambot.model.TransactionType;
+import io.nesvpn.telegrambot.enums.TransactionType;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.repository.BalanceTransactionRepository;
 import io.nesvpn.telegrambot.repository.UserRepository;

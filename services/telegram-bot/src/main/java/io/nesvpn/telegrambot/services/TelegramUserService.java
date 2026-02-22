@@ -1,6 +1,6 @@
 package io.nesvpn.telegrambot.services;
 
-import io.nesvpn.telegrambot.model.BotState;
+import io.nesvpn.telegrambot.enums.BotState;
 import io.nesvpn.telegrambot.model.TelegramUser;
 import io.nesvpn.telegrambot.repository.TelegramUserRepository;
 import lombok.RequiredArgsConstructor;
