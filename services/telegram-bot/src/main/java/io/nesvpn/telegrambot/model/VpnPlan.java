@@ -22,7 +22,7 @@ public class VpnPlan {
     private Integer price;
 
     @Column(name = "duration", nullable = false)
-    private Integer duration;  // В днях (180 дней = 6 месяцев)
+    private Integer duration;
 
     @Column(name = "country", nullable = false)
     private String country;
