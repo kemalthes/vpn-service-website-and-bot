@@ -1,9 +1,8 @@
 package io.nesvpn.telegrambot.services;
 
-import io.nesvpn.telegrambot.model.TransactionType;
+import io.nesvpn.telegrambot.enums.TransactionType;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.repository.UserRepository;
-import io.nesvpn.telegrambot.services.BalanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

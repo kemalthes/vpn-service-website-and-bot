@@ -1,5 +1,6 @@
 package io.nesvpn.telegrambot.model;
 
+import io.nesvpn.telegrambot.enums.TransactionType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;

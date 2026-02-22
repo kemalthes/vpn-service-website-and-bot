@@ -1,6 +1,6 @@
 package io.nesvpn.telegrambot.handler;
 
-import io.nesvpn.telegrambot.model.BotState;
+import io.nesvpn.telegrambot.enums.BotState;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.services.TelegramUserService;
 import io.nesvpn.telegrambot.services.UserService;
@@ -9,8 +9,6 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-
-import static io.nesvpn.telegrambot.model.BotState.*;
 
 @Service
 public class CallbackQueryHandler {
