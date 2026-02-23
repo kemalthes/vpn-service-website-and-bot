@@ -1,6 +1,10 @@
 package io.nesvpn.telegrambot.handler;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.nesvpn.telegrambot.dto.CryptoPayment;
 import io.nesvpn.telegrambot.enums.BotState;
+import io.nesvpn.telegrambot.enums.PaymentMethod;
+import io.nesvpn.telegrambot.enums.PaymentStatus;
 import io.nesvpn.telegrambot.enums.TransactionType;
 import io.nesvpn.telegrambot.model.*;
 import io.nesvpn.telegrambot.services.*;
@@ -12,14 +16,25 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCaption;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -34,6 +49,10 @@ public class MessageHandler {
     private final TokenService tokenService;
     private final VpnPlanService vpnPlanService;
     private final OrderService orderService;
+    private final FloatRatesService floatRatesService;
+    private final TonPaymentService tonPaymentService;
+    private final PaymentService paymentService;
+    private final CooldownService cooldownService;
 
     public MessageHandler(
             UserService userService,
@@ -44,6 +63,10 @@ public class MessageHandler {
             TokenService tokenService,
             VpnPlanService vpnPlanService,
             OrderService orderService,
+            FloatRatesService floatRatesService,
+            TonPaymentService tonPaymentService,
+            PaymentService paymentService,
+            CooldownService cooldownService,
             @Lazy VpnBot vpnBot
     ) {
         this.userService = userService;
@@ -54,6 +77,10 @@ public class MessageHandler {
         this.tokenService = tokenService;
         this.vpnPlanService = vpnPlanService;
         this.orderService = orderService;
+        this.floatRatesService = floatRatesService;
+        this.tonPaymentService = tonPaymentService;
+        this.paymentService = paymentService;
+        this.cooldownService = cooldownService;
         this.vpnBot = vpnBot;
     }
 
@@ -81,6 +108,8 @@ public class MessageHandler {
             
             if (telegramUser.getState().equals(BotState.BALANCE_AWAITING_AMOUNT.toString())) {
                 handleAmountInput(message);
+            } else if (telegramUser.getState().equals(BotState.BALANCE_AWAITING_AMOUNT_CRYPTO.toString())) {
+                handleAmountInputCrypto(message);
             } else {
                 deleteMessage(message.getChatId(), message.getMessageId());
             }
@@ -208,6 +237,47 @@ public class MessageHandler {
         }
     }
 
+    public void handleAmountInputCrypto(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+        User user = userService.findOrCreateByTgId(userId);
+
+        try {
+            double amount = Double.parseDouble(message.getText().trim().replaceAll("[^0-9,.]", ""));
+            if (amount < 1) {
+                sendError(chatId, """
+                    ❌ Минимальная сумма пополнения — *1$*
+                    
+                    Введите другую сумму (1 - 25$):
+                    """);
+
+                showAwaitingBalanceWithCrypto(chatId, null, user);
+                return;
+            }
+
+            if (amount > 25) {
+                sendError(chatId, """
+                    ❌ Максимальная сумма пополнения — *25$*
+                    
+                    Введите другую сумму:
+                    """);
+
+                showAwaitingBalanceWithCrypto(chatId, null, user);
+                return;
+            }
+
+            showPaymentWithCrypto(chatId, amount, user);
+        } catch (NumberFormatException e) {
+            sendError(chatId, """
+                ❌ Неверный формат суммы
+                
+                Введите число от *1$* до *25$*:"
+                """);
+
+            showAwaitingBalanceWithCrypto(chatId, null, user);
+        }
+    }
+
     public void checkPayment(Long chatId, Integer messageId, String transactionId, Integer amount, User user) {
         boolean isPaid = true;
 
@@ -312,6 +382,171 @@ public class MessageHandler {
         }
     }
 
+    public void checkPaymentCrypto(Long chatId, Integer messageId, String transactionId, User user) {
+        Optional<Payment> paymentOpt = paymentService.getPaymentByToken(transactionId);
+
+        if (paymentOpt.isEmpty()) {
+            String errorText = String.format("""
+            ❌ <b>Платеж не найден</b>
+    
+            ID транзакции: <code>%s</code>
+    
+            Пожалуйста, проверьте данные или создайте новый платеж.
+            """, transactionId);
+
+            editMessageCaption(chatId, messageId, errorText, null);
+            return;
+        }
+
+        Payment payment = paymentOpt.get();
+        PaymentStatus lastStatus = PaymentStatus.fromString(payment.getStatus());
+
+        if (!cooldownService.canCheck(chatId)) {
+            long remaining = cooldownService.getRemainingCooldown(chatId);
+            String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+
+            String fullText = String.format("""
+    
+            ⏰ <b>Проверка в %s</b>
+    
+            ⏳ <b>Слишком частые проверки</b>
+    
+            Проверять платеж можно раз в 10 секунд.
+            Подождите ещё <b>%d секунд</b>.
+            """, currentTime, remaining);
+
+            editMessageCaption(chatId, messageId, fullText,
+                    keyboardFactory.getPaymentCheckCryptoKeyboard(payment.getTransactionToken(), null));
+            return;
+        }
+
+        cooldownService.updateLastCheckTime(chatId);
+
+        if (payment.getExpiresAt().isBefore(LocalDateTime.now())) {
+            if (!lastStatus.equals(PaymentStatus.EXPIRED)) {
+                paymentService.markPaymentAsExpired(transactionId);
+            }
+
+            String expiredText = String.format("""
+            ⌛️ <b>Срок платежа истек: %s</b>
+    
+            Платеж больше не действителен.
+            Создайте новый платеж для пополнения.
+            """.formatted(transactionId));
+
+            editMessageCaption(chatId, messageId, expiredText, null);
+            return;
+        }
+
+        CryptoPayment cryptoPayment = tonPaymentService.createUsdtPayment(payment);
+        String expiryTime = Formatter.formatExpiryTime(cryptoPayment.getExpiresAt());
+
+        String baseText = String.format("""
+        💸 <b>Пополнение баланса криптовалютой</b>
+
+        💰 Сумма в рублях: <b>%s руб</b>
+        💎 USDT: <code>%s</code> $
+        📝 Memo: <code>%s</code>
+
+        ⏳ <b>Действителен до:</b> %s (по мск)
+
+        🔗 <b>Tonkeeper ссылка: </b>
+        %s
+
+        📱 <b>Инструкция:</b>
+        1️⃣ Нажмите кнопку "🚀 Оплатить"
+        2️⃣ Проверьте сумму и получателя
+        3️⃣ Подтвердите транзакцию в кошельке
+        4️⃣ Нажмите "Проверить оплату" ниже
+
+        ⚠️ <b>Важно:</b> Убедитесь, что memo совпадает!
+        """,
+                cryptoPayment.getAmountRub(),
+                cryptoPayment.getAmountUsdt(),
+                cryptoPayment.getTransactionId(),
+                expiryTime,
+                cryptoPayment.getTonLink());
+
+        boolean isPaid = paymentService.checkAndConfirmCryptoPayment(transactionId);
+
+        if (!isPaid) {
+            String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+
+            String fullText = baseText + String.format("""
+    
+            ⏰ <b>Проверка в %s</b>
+    
+            ❌ <b>Платёж ещё не найден</b>
+    
+            Платеж еще не поступил или обрабатывается.
+            Пожалуйста, попробуйте снова через 10 секунд.
+            """, currentTime);
+
+            editMessageCaption(chatId, messageId, fullText,
+                    keyboardFactory.getPaymentCheckCryptoKeyboard(cryptoPayment.getTransactionId(), cryptoPayment.getTonLink()));
+
+        } else {
+            editMessageCaption(chatId, messageId, baseText + "\n<b>Мы увидели ее в блокчейне</b>", null);
+            if (lastStatus.equals(PaymentStatus.PENDING)) {
+                User updatedUser = userService.getUserById(user.getId());
+                showSuccessPayment(chatId, cryptoPayment, updatedUser);
+            }
+        }
+    }
+
+    public void showExpiredPayment(Long chatId, String transactionId) {
+        String text = """
+                ⌛️ <b>Срок платежа истек: %s</b>
+        
+                Платеж больше не действителен.
+                Создайте новый платеж для пополнения.
+                """.formatted(transactionId);
+
+        SendMessage expiredMessage = new SendMessage();
+        expiredMessage.setChatId(chatId.toString());
+        expiredMessage.setText(text);
+        expiredMessage.setParseMode("HTML");
+        expiredMessage.setReplyMarkup(keyboardFactory.getBackButton());
+
+        try {
+            vpnBot.execute(expiredMessage);
+
+            telegramUserService.updateState(chatId, BotState.PAYMENT_AWAITING_CONFIRMATION_CRYPTO,
+                    BotState.BALANCE);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showSuccessPayment(Long chatId, CryptoPayment cryptoPayment, User user) {
+        String successText = String.format("""
+                                    ✅ <b>Оплата подтверждена!</b>
+                              
+                                    💰 Ваш баланс пополнен на <b>%s ₽</b>
+                                    💎 USDT: <code>%s</code> $
+                                    📊 Текущий баланс: <b>%.2f ₽</b>
+                                    
+                                    Спасибо за использование нашего сервиса!
+                                    """,
+                cryptoPayment.getAmountRub(),
+                cryptoPayment.getAmountUsdt(),
+                user.getBalance());
+
+        SendMessage successMessage = new SendMessage();
+        successMessage.setChatId(chatId.toString());
+        successMessage.setText(successText);
+        successMessage.setParseMode("HTML");
+        successMessage.setReplyMarkup(keyboardFactory.getBackButton());
+
+        try {
+            vpnBot.execute(successMessage);
+
+            telegramUserService.updateState(chatId, BotState.PAYMENT_AWAITING_CONFIRMATION_CRYPTO,
+                    BotState.BALANCE);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void showPayment(Long chatId, int amount, User user) {
         telegramUserService.updateState(chatId, BotState.PAYMENT_AWAITING_CONFIRMATION, BotState.BALANCE_AWAITING_AMOUNT);
@@ -343,6 +578,143 @@ public class MessageHandler {
             vpnBot.execute(sendMessage);
         } catch (TelegramApiException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void showPaymentWithCrypto(Long chatId, double amount, User user) {
+        try {
+            Payment payment = paymentService.createPayment(user.getId(), amount, PaymentMethod.CRYPTO.getValue(), "USDT");
+
+            if (payment != null) {
+                CryptoPayment cryptoPayment = tonPaymentService.createUsdtPayment(payment);
+                byte[] qrBytes = Base64.getDecoder().decode(cryptoPayment.getQrCodeBase64());
+                telegramUserService.updateState(chatId, BotState.BALANCE_AWAITING_AMOUNT, BotState.BALANCE_AWAITING_AMOUNT);
+                showPhotoDirectly(chatId, qrBytes, cryptoPayment);
+            } else {
+                telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT_CRYPTO, BotState.BALANCE);
+                showErrorCreatePayment(chatId, user);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void showErrorCreatePayment(Long chatId, User user) {
+        List<Payment> pendingPayments = paymentService.getUserPendingPayments(user.getId());
+        int pendingCount = pendingPayments.size();
+
+        String messageText = String.format("""
+                    ⚠️ <b>Невозможно создать новый платёж</b>
+            
+                    У вас уже <b>%d из 5</b> возможных активных платежей.
+            
+                    🔴 <b>Что делать?</b>
+                    • Оплатите один из существующих платежей
+                    • Дождитесь истечения срока
+            
+                    👇 Нажмите кнопку для просмотра платежей
+                    """, pendingCount);
+        try {
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(chatId);
+            sendMessage.setText(messageText);
+            sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+            sendMessage.setParseMode("HTML");
+            vpnBot.execute(sendMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void showPhotoDirectly(Long chatId, byte[] qrBytes, CryptoPayment payment) {
+        try {
+            String botToken = vpnBot.getBotToken();
+            String url = "https://api.telegram.org/bot" + botToken + "/sendPhoto";
+
+            String expiryTime = Formatter.formatExpiryTime(payment.getExpiresAt());
+
+            String caption = String.format("""
+        💸 <b>Пополнение баланса криптовалютой</b>
+        
+        💰 Сумма в рублях: <b>%s руб</b>
+        💎 USDT: <code>%s</code> $
+        📝 Memo: <code>%s</code>
+        
+        ⏳ <b>Действителен до:</b> %s (по мск)
+        
+        🔗 <b>Tonkeeper ссылка: </b>
+        %s
+        
+        📱 <b>Инструкция:</b>
+        1️⃣ Нажмите кнопку "🚀 Оплатить"
+        2️⃣ Проверьте сумму и получателя
+        3️⃣ Подтвердите транзакцию в кошельке
+        4️⃣ Нажмите "Проверить оплату" ниже
+        
+        ⚠️ <b>Важно:</b> Убедитесь, что memo совпадает!
+        """,
+                    payment.getAmountRub(),
+                    payment.getAmountUsdt(),
+                    payment.getTransactionId(),
+                    expiryTime,
+                    payment.getTonLink()
+            );
+
+            String boundary = "------------------------" + System.currentTimeMillis();
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+            writePart(outputStream, boundary, "chat_id", chatId.toString());
+
+            writeFilePart(outputStream, boundary, "photo", "qr.png", qrBytes);
+
+            writePart(outputStream, boundary, "caption", caption);
+
+            writePart(outputStream, boundary, "parse_mode", "HTML");
+
+            ObjectMapper mapper = new ObjectMapper();
+            String replyMarkupJson = mapper.writeValueAsString(keyboardFactory.getPaymentCheckCryptoKeyboard(payment.getTransactionId(), payment.getTonLink()));
+            writePart(outputStream, boundary, "reply_markup", replyMarkupJson);
+
+            outputStream.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+
+            HttpClient client = HttpClient.newHttpClient();
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "multipart/form-data; charset=utf-8; boundary=" + boundary)
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(outputStream.toByteArray()))
+                    .build();
+
+            HttpResponse<String> response = client.send(request,
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void writePart(ByteArrayOutputStream outputStream, String boundary, String name, String value) {
+        try {
+            outputStream.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
+            outputStream.write(("Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            outputStream.write((value + "\r\n").getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write multipart data", e);
+        }
+    }
+
+    private void writeFilePart(ByteArrayOutputStream outputStream, String boundary, String name, String filename, byte[] data) {
+        try {
+            outputStream.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
+            outputStream.write(("Content-Disposition: form-data; name=\"" + name + "\"; filename=\"" + filename + "\"\r\n").getBytes(StandardCharsets.UTF_8));
+            outputStream.write(("Content-Type: image/png\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            outputStream.write(data);
+            outputStream.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to write multipart file data", e);
         }
     }
 
@@ -836,6 +1208,45 @@ public class MessageHandler {
         }
     }
 
+    public void showAwaitingBalanceWithCrypto(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT_CRYPTO, BotState.BALANCE_TOP_UP);
+
+        double rubRate = floatRatesService.getUsdToRubRate();
+        String formattedRate = String.format("%.2f", rubRate);
+
+        String text = """
+        💰 *Пополнение баланса USDT (TON)*
+        
+        Введите сумму пополнения от *1$* до *25$*
+        
+        *Цена за 1 USDT:* %s руб.
+        
+        Например: `5`
+        """.formatted(formattedRate);
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                editMessage.setParseMode("Markdown");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+
     public void showSubscription(Long chatId, Integer messageId, User user) {
         Long tgId = user.getTgId();
         telegramUserService.updateState(tgId, BotState.SUBSCRIPTIONS, BotState.START);
@@ -873,7 +1284,7 @@ public class MessageHandler {
         } else {
             long daysLeft = tokenService.getDaysLeft(token);
             boolean isActive = token.isActive();
-            String tokenUrl = Formatter.getCrypt5Url(token.getToken());
+            String tokenUrl = token.getToken();
 
             String statusEmoji = isActive ? "✅" : "❌";
             String statusText = isActive ? "Активна" : "Истекла";
@@ -1224,6 +1635,24 @@ public class MessageHandler {
         deleteMessage.setMessageId(messageId);
         try {
             vpnBot.execute(deleteMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void editMessageCaption(Long chatId, Integer messageId, String caption, InlineKeyboardMarkup keyboard) {
+        try {
+            EditMessageCaption editCaption = new EditMessageCaption();
+            editCaption.setChatId(chatId.toString());
+            editCaption.setMessageId(messageId);
+            editCaption.setCaption(caption);
+            editCaption.setParseMode("HTML");
+
+            if (keyboard != null) {
+                editCaption.setReplyMarkup(keyboard);
+            }
+
+            vpnBot.execute(editCaption);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }

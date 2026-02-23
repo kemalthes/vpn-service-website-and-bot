@@ -23,3 +23,15 @@ databaseChangeLog:
   - include:
       file: ddl/20260203-create-balance-transactions-table.yml
       relativeToChangelogFile: true
+  - include:
+      file: ddl/20260223-update-payments.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260223-rename-transaction-token.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260223-update-payments-nullable-payment-date.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260223-update-status-constraint.yml
+      relativeToChangelogFile: true

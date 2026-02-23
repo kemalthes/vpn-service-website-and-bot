@@ -75,6 +75,9 @@ public class CallbackQueryHandler {
             case "payment_method_sbp" -> {
                 messageHandler.showAwaitingBalance(chatId, messageId, user);
             }
+            case "payment_method_usdt" -> {
+                messageHandler.showAwaitingBalanceWithCrypto(chatId, messageId, user);
+            }
             case "subscription" -> {
                 messageHandler.showSubscription(chatId, messageId, user);
             }
@@ -83,8 +86,8 @@ public class CallbackQueryHandler {
             }
         }
 
-        if (data.startsWith("check_payment_")) {
-            String[] parts = data.replace("check_payment_", "").split("_");
+        if (data.startsWith("check_payment_sbp")) {
+            String[] parts = data.replace("check_payment_sbp", "").split("_");
             String transactionId = parts[0];
             Integer amount = Integer.parseInt(parts[1]);
             messageHandler.checkPayment(chatId, messageId, transactionId, amount, user);
@@ -98,6 +101,10 @@ public class CallbackQueryHandler {
             Long tokenId = Long.parseLong(parts[0]);
             Long planId = Long.parseLong(parts[1]);
             messageHandler.showExtendProcess(chatId, messageId, tokenId, planId, user);
+        } else if (data.startsWith("check_payment_crypto_")) {
+            String[] parts = data.replace("check_payment_crypto_", "").split("_");
+            String transactionId = parts[0];
+            messageHandler.checkPaymentCrypto(chatId, messageId, transactionId, user);
         }
     }
 

@@ -11,6 +11,7 @@ import org.telegram.telegrambots.meta.generics.TelegramBot;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -36,6 +37,10 @@ public class UserService {
         // TODO: создать для него ссылку на 3 дня, с максимум устройствами 3, и всего гб 30 гб
 
         return userRepository.save(user);
+    }
+
+    public User getUserById(UUID userId) {
+        return userRepository.findById(userId).orElse(null);
     }
 
     public User findByReferralCode(String referralCode) {

@@ -1,0 +1,10 @@
+databaseChangeLog:
+  - changeSet:
+      id: 16-rename-transaction-token
+      author: bulat
+      changes:
+        - renameColumn:
+            tableName: payments
+            oldColumnName: transactionToken
+            newColumnName: transaction_token
+            columnDataType: varchar(255)

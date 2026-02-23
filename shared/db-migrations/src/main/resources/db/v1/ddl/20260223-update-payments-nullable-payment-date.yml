@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 17-make-payment-date-nullable
+      author: bulat
+      changes:
+        - modifyDataType:
+            tableName: payments
+            columnName: payment_date
+            newDataType: timestamp
+
+        - dropNotNullConstraint:
+            tableName: payments
+            columnName: payment_date
+            columnDataType: timestamp

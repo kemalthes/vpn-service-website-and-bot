@@ -18,7 +18,6 @@ public class VpnBot extends TelegramLongPollingBot {
     private String botUsername;
 
     private final MessageHandler messageHandler;
-
     private final CallbackQueryHandler callbackQueryHandler;
 
     @Override

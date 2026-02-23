@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 20-update-status-constraint
+      author: bulat
+      changes:
+        - sql:
+            sql: ALTER TABLE payments DROP CONSTRAINT IF EXISTS ch_payments_status;
+
+        - sql:
+            sql: |
+              ALTER TABLE payments 
+              ADD CONSTRAINT ch_payments_status 
+              CHECK (status IN ('PENDING', 'COMPLETED', 'FAILED', 'EXPIRED', 'REFUNDED'));
