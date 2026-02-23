@@ -116,5 +116,11 @@ project(":telegram-bot") {
         implementation("org.telegram:telegrambots-spring-boot-starter:6.7.0")
         runtimeOnly("org.postgresql:postgresql")
         implementation("org.telegram:telegrambots-spring-boot-starter:$telegramBotsVersion")
+        implementation("io.github.neodix42:tonlib:0.5.0")
+        implementation("com.google.zxing:core:3.5.3")
+        implementation("com.google.zxing:javase:3.5.3")
+        implementation("org.telegram:telegrambots:6.9.7.1")
+        implementation("commons-codec:commons-codec:1.16.0")
+        implementation("org.slf4j:slf4j-api:2.0.9")
     }
 }

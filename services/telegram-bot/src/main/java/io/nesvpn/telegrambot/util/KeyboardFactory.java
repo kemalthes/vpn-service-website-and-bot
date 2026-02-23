@@ -1,5 +1,6 @@
 package io.nesvpn.telegrambot.util;
 
+import io.nesvpn.telegrambot.dto.CryptoPayment;
 import io.nesvpn.telegrambot.model.VpnPlan;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -9,6 +10,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -67,7 +69,7 @@ public class KeyboardFactory {
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         InlineKeyboardButton checkButton = new InlineKeyboardButton();
         checkButton.setText("🔄 Проверить оплату");
-        checkButton.setCallbackData("check_payment_" + transactionId + "_" + amount);
+        checkButton.setCallbackData("check_payment_sbp" + transactionId + "_" + amount);
         row2.add(checkButton);
         rows.add(row2);
 
@@ -88,15 +90,48 @@ public class KeyboardFactory {
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton cryptoButton = new InlineKeyboardButton();
+        cryptoButton.setText("\uD83D\uDCB2 USDT (Ton)");
+        cryptoButton.setCallbackData("payment_method_usdt");
+        row2.add(cryptoButton);
+        rows.add(row2);
+
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
         InlineKeyboardButton backButton = new InlineKeyboardButton();
         backButton.setText("◀️ Назад");
         backButton.setCallbackData("back");
-        row2.add(backButton);
-        rows.add(row2);
+        row3.add(backButton);
+        rows.add(row3);
 
         markup.setKeyboard(rows);
 
         return markup;
+    }
+
+    public InlineKeyboardMarkup getPaymentCheckCryptoKeyboard(String transactionId, String tonLink) {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        if (tonLink != null) {
+            List<InlineKeyboardButton> row1 = new ArrayList<>();
+            InlineKeyboardButton sendButton = new InlineKeyboardButton();
+            sendButton.setText("\uD83D\uDE80 Оплатить");
+            sendButton.setUrl(tonLink);
+            row1.add(sendButton);
+            rows.add(row1);
+        }
+
+
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton checkButton = new InlineKeyboardButton();
+        checkButton.setText("🔄 Проверить оплату");
+        checkButton.setCallbackData("check_payment_crypto_" + transactionId);
+        row2.add(checkButton);
+        rows.add(row2);
+
+        keyboard.setKeyboard(rows);
+
+        return keyboard;
     }
 
     public InlineKeyboardMarkup getBackButton() {
