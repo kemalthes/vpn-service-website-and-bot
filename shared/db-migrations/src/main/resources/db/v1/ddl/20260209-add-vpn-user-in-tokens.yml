@@ -2,6 +2,12 @@ databaseChangeLog:
   - changeSet:
       id: 13-add-vpn-user
       author: kemalthes
+      preConditions:
+        - not:
+            columnExists:
+              tableName: tokens
+              columnName: vpn_panel_user_uuid
+        - onFail: MARK_RAN
       changes:
         - addColumn:
             tableName: tokens

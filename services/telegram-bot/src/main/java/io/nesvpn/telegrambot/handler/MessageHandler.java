@@ -7,6 +7,8 @@ import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.enums.PaymentStatus;
 import io.nesvpn.telegrambot.enums.TransactionType;
 import io.nesvpn.telegrambot.model.*;
+import io.nesvpn.telegrambot.rabbit.LinkRequest;
+import io.nesvpn.telegrambot.rabbit.LinkRequestProducer;
 import io.nesvpn.telegrambot.services.*;
 import io.nesvpn.telegrambot.services.ReferralService;
 import io.nesvpn.telegrambot.util.DisplayTelegramUsername;
@@ -48,6 +50,7 @@ public class MessageHandler {
     private final BalanceService balanceService;
     private final TokenService tokenService;
     private final VpnPlanService vpnPlanService;
+    private final LinkRequestProducer linkRequestProducer;
     private final OrderService orderService;
     private final FloatRatesService floatRatesService;
     private final TonPaymentService tonPaymentService;
@@ -62,6 +65,7 @@ public class MessageHandler {
             BalanceService balanceService,
             TokenService tokenService,
             VpnPlanService vpnPlanService,
+            @Lazy VpnBot vpnBot, LinkRequestProducer linkRequestProducer
             OrderService orderService,
             FloatRatesService floatRatesService,
             TonPaymentService tonPaymentService,
@@ -82,6 +86,7 @@ public class MessageHandler {
         this.paymentService = paymentService;
         this.cooldownService = cooldownService;
         this.vpnBot = vpnBot;
+        this.linkRequestProducer = linkRequestProducer;
     }
 
     public void handle(Message message) {
@@ -1592,6 +1597,7 @@ public class MessageHandler {
         Order order = orderService.createOrder(user.getId(), plan);
 
         // TODO: Async обработка продления через API
+        linkRequestProducer.sendLinkGenerationTask(LinkRequest.builder().orderId(1L).planId(planId).userId(user.getId()).build());
         // user.getId(), order.getId(), plan.getId()
 
         try {

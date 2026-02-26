@@ -11,5 +11,13 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
-#project:
-#  vpn-panel-squad-uuid: ${VPN_PANEL_SQUAD_UUID}
+project:
+  limit-devices: 5
+  limit-devices-free: 3
+  traffic-limit-free: 30L * 1024 * 1024 * 1024
+  days-limit: 1
+
+remnawave:
+  url: ${VPN_PANEL_DOMAIN}
+  key: ${VPN_PANEL_BEARER}
+  squad-uuid: ${VPN_PANEL_SQUAD_UUID}

@@ -8,9 +8,15 @@ spring:
     publisher-returns: true
     listener:
       simple:
-        acknowledge-mode: manual
-        prefetch: 1
+        acknowledge-mode: auto
+        prefetch: 3
         retry:
           enabled: true
           multiplier: 2
+    template:
+      retry:
+        enabled: true
+        max-retries: 5
+        multiplier: 2
+        max-interval: 20000ms
     connection-timeout: 20000

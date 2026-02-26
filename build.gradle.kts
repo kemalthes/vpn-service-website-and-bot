@@ -15,13 +15,15 @@ val caffeineVersion = "3.2.2"
 val springdocVersion = "3.0.0"
 val telegramBotsVersion = "6.7.0"
 
-subprojects {
-    apply(plugin = "java")
-    apply(plugin = "io.spring.dependency-management")
-
+allprojects {
     repositories {
         mavenCentral()
     }
+}
+
+subprojects {
+    apply(plugin = "java")
+    apply(plugin = "io.spring.dependency-management")
 
     java {
         toolchain {
@@ -63,14 +65,14 @@ configure(listOf(
 
 project(":db-migrations") {
     dependencies {
-        implementation("org.springframework.boot:spring-boot-starter-liquibase")
+        api("org.springframework.boot:spring-boot-starter-liquibase")
     }
 }
 
 project(":rabbitmq-config") {
     dependencies {
-        implementation("org.springframework.boot:spring-boot-starter-amqp")
-        implementation("com.fasterxml.jackson.core:jackson-databind")
+        api("org.springframework.boot:spring-boot-starter-amqp")
+        api("com.fasterxml.jackson.core:jackson-databind")
     }
 }
 
@@ -108,6 +110,8 @@ project(":subscribe-link-service") {
         implementation(project(":rabbitmq-config"))
         implementation(project(":db-migrations"))
         implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+        implementation("org.springframework.boot:spring-boot-starter-webflux")
+        implementation("org.springframework.boot:spring-boot-starter-validation")
         runtimeOnly("org.postgresql:postgresql")
     }
 }
@@ -116,6 +120,7 @@ project(":telegram-bot") {
     dependencies {
         implementation(project(":db-migrations"))
         implementation(project(":rabbitmq-config"))
+        implementation("org.springframework.retry:spring-retry:2.0.10")
         implementation("org.springframework.boot:spring-boot-starter-data-jpa")
         implementation("org.telegram:telegrambots-spring-boot-starter:6.7.0")
         runtimeOnly("org.postgresql:postgresql")

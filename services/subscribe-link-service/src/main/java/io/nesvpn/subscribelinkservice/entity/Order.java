@@ -1,6 +1,6 @@
 package io.nesvpn.subscribelinkservice.entity;
 
-import io.nesvpn.subscribelinkservice.enums.TokenStatus;
+import io.nesvpn.subscribelinkservice.enums.OrderStatus;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -9,45 +9,38 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.cglib.core.Local;
 
-import java.time.LocalDateTime;
-import java.util.Date;
-import java.util.UUID;
+import java.time.Instant;
 
 @Getter
 @Setter
 @Entity
 @Builder
-@Table(name = "tokens")
+@Table(name = "orders")
 @NoArgsConstructor
 @AllArgsConstructor
-public class Token {
-
+public class Order {
     @Id
-    @GeneratedValue(strategy= GenerationType.IDENTITY)
-    private long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    private String token;
-
-    private LocalDateTime createdAt;
-
-    private LocalDateTime validTo;
-
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    private UUID vpnPanelUserUuid;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vpn_plan_id")
+    private VpnPlan vpnPlan;
 
     @Enumerated(EnumType.STRING)
-    private TokenStatus status;
+    private OrderStatus status;
+
+    private Instant createdAt;
 }
