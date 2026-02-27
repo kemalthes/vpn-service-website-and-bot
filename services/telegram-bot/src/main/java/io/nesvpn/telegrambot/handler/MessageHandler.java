@@ -1180,6 +1180,37 @@ public class MessageHandler {
         }
     }
 
+    public void showAwaitingBalanceDev(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.BALANCE_TOP_UP, BotState.BALANCE_TOP_UP);
+
+        String text = """
+        💰 *Пополнение баланса по СБП*
+        
+        Данный раздел находиться в разработке, для пополнения *обратитесь к администратору* или используйте *другие способы оплаты*.
+        """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                editMessage.setParseMode("Markdown");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void showAwaitingBalance(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT, BotState.BALANCE_TOP_UP);
 
