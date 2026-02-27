@@ -2,19 +2,18 @@ package io.nesvpn.telegrambot.util;
 
 import io.nesvpn.telegrambot.dto.CryptoPayment;
 import io.nesvpn.telegrambot.model.VpnPlan;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Component
 public class KeyboardFactory {
+    @Value("${bot.channel.username}")
+    private String channelUsername;
 
     public InlineKeyboardMarkup getMainMenuInline() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -131,6 +130,25 @@ public class KeyboardFactory {
 
         keyboard.setKeyboard(rows);
 
+        return keyboard;
+    }
+
+    public InlineKeyboardMarkup getSubscribeChannelKeyboard() {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        String channelLink = "https://t.me/" + channelUsername;
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+
+        InlineKeyboardButton titleButton = new InlineKeyboardButton();
+        titleButton.setText("📢 Подписаться на канал");
+        titleButton.setUrl(channelLink);
+        row1.add(titleButton);
+
+        rows.add(row1);
+
+        keyboard.setKeyboard(rows);
         return keyboard;
     }
 

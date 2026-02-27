@@ -71,8 +71,7 @@ public class MessageHandler {
             FloatRatesService floatRatesService,
             TonPaymentService tonPaymentService,
             PaymentService paymentService,
-            CooldownService cooldownService
-    ) {
+            CooldownService cooldownService) {
         this.userService = userService;
         this.telegramUserService = telegramUserService;
         this.referralService = referralService;
@@ -91,6 +90,10 @@ public class MessageHandler {
 
     public void handle(Message message) {
         String text = message.getText();
+
+        if (!telegramUserService.existsByTgId(message.getFrom().getId())) {
+            showSubscribeChannel(message.getChatId(), null);
+        }
 
         if (text.startsWith("/start")) {
             handleStart(message);
@@ -1186,7 +1189,7 @@ public class MessageHandler {
         String text = """
         💰 *Пополнение баланса по СБП*
         
-        Данный раздел находиться в разработке, для пополнения *обратитесь к администратору* или используйте *другие способы оплаты*.
+        Данный раздел находится в разработке, для пополнения *обратитесь к администратору* или используйте *другие способы оплаты*.
         """;
 
         try {
@@ -1282,6 +1285,34 @@ public class MessageHandler {
         }
     }
 
+    public void showSubscribeChannel(Long chatId, Integer messageId) {
+        String text = """
+            📱 <b>Рекомендуем подписаться на канал</b>
+            
+            <i>💡 Чтобы быть в курсе всех новостей и анонсов, просим подписаться</i>
+            """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text.trim());
+                editMessage.setReplyMarkup(keyboardFactory.getSubscribeChannelKeyboard());
+                editMessage.setParseMode("HTML");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getSubscribeChannelKeyboard());
+                sendMessage.setParseMode("HTML");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void showSubscription(Long chatId, Integer messageId, User user) {
         Long tgId = user.getTgId();
