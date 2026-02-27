@@ -9,12 +9,12 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -23,6 +23,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final BalanceService balanceService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Order createOrder(UUID userId, VpnPlan plan) {
@@ -30,10 +31,9 @@ public class OrderService {
         newOrder.setUserId(userId);
         newOrder.setVpnPlanId(plan.getId());
         newOrder.setStatus(OrderStatus.PAID.getValue());
-
         Order savedOrder = orderRepository.save(newOrder);
         balanceService.subtractBalance(userId, BigDecimal.valueOf(plan.getPrice()), TransactionType.SUBSCRIPTION_PURCHASE, "Продление VPN-подписки на " + plan.getDuration() + " дней");
-
+        eventPublisher.publishEvent(new OrderPaidEvent(userId, savedOrder.getId(), plan.getId()));
         return savedOrder;
     }
 
@@ -57,4 +57,6 @@ public class OrderService {
     public List<Order> getOrdersByStatus(OrderStatus status) {
         return orderRepository.findAllByStatus(status.getValue());
     }
+
+    public record OrderPaidEvent(UUID userId, Long orderId, Long planId) {}
 }

@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 21-add-new-free-vpn-plan
+      author: kemalthes
+      changes:
+        - insert:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: id
+                  value: '4'
+              - column:
+                  name: name
+                  value: "Тест период"
+              - column:
+                  name: price
+                  value: '0'
+              - column:
+                  name: duration
+                  value: '2'
+              - column:
+                  name: country
+                  value: "All"

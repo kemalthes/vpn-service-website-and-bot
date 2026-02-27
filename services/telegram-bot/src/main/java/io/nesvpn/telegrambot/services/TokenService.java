@@ -4,6 +4,7 @@ import io.nesvpn.telegrambot.model.Token;
 import io.nesvpn.telegrambot.repository.TokenRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Transactional
 public class TokenService {
+
+    @Value("${project.vpn-host-url}")
+    private String vpnHostUrl;
 
     private final TokenRepository tokenRepository;
 
@@ -39,5 +43,9 @@ public class TokenService {
 
     public Optional<Token> findById(Long id) {
         return tokenRepository.findById(id);
+    }
+
+    public String getFullTokenUrl(Token token) {
+        return vpnHostUrl + token.getToken();
     }
 }

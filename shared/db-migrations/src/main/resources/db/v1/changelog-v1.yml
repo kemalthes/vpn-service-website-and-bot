@@ -42,3 +42,6 @@ databaseChangeLog:
   - include:
       file: ddl/20260223-update-status-constraint.yml
       relativeToChangelogFile: true
+  - include:
+      file: dml/20260227-insert-free-vpn-plan.yml
+      relativeToChangelogFile: true

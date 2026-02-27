@@ -1,15 +1,14 @@
 package io.nesvpn.telegrambot.services;
 
+import io.nesvpn.telegrambot.model.Order;
 import io.nesvpn.telegrambot.model.User;
-import io.nesvpn.telegrambot.rabbit.LinkRequest;
 import io.nesvpn.telegrambot.rabbit.LinkRequestProducer;
 import io.nesvpn.telegrambot.repository.UserRepository;
-import io.nesvpn.telegrambot.services.ReferralService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.telegram.telegrambots.meta.generics.TelegramBot;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,10 +20,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
     private final UserRepository userRepository;
     private final ReferralService referralService;
-    private final LinkRequestProducer linkRequestProducer;
+    private final OrderService orderService;
+    private final VpnPlanService vpnPlanService;
 
+    @Transactional
     public User findOrCreateByTgId(Long tgId) {
         return userRepository.findByTgId(tgId)
                 .orElseGet(() -> createTelegramUser(tgId));
@@ -38,12 +40,10 @@ public class UserService {
         user.setReferralCode(referralService.generateReferralCode(tgId));
         user.setBalance(BigDecimal.ZERO);
         user.setCreatedAt(LocalDateTime.now());
-
-        log.info("User created: {}", user);
-        // TODO: создать для него ссылку на 3 дня, с максимум устройствами 3, и всего гб 30 гб
-        linkRequestProducer.sendLinkGenerationTask(LinkRequest.builder().userId(user.getId()).build());
-
-        return userRepository.save(user);
+        userRepository.save(user);
+        Order order = orderService.createOrder(user.getId(), vpnPlanService.findById(4L).orElseThrow());
+        log.info("User created: {}, order id: {}", user, order.getId());
+        return user;
     }
 
     public User getUserById(UUID userId) {

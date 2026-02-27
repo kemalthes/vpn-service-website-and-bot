@@ -84,7 +84,7 @@ public class RemnawaveClient implements VpnClient {
                 .bodyValue(updateBody)
                 .retrieve()
                 .bodyToMono(Map.class)
-                .doOnNext(json -> log.info("✅ [Update] Успешно обновлен юзер {}. Ответ: {}", userUuid, json))
+                .doOnNext(json -> log.info("[Update] Успешно обновлен юзер {}. Ответ: {}", userUuid, json))
                 .doOnError(WebClientResponseException.class, ex -> log.error("[Update] API вернуло HTTP ошибку! Статус: {}. Ответ: {}",
                         ex.getStatusCode(), ex.getResponseBodyAsString()))
                 .doOnError(ex -> {
