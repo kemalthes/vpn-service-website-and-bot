@@ -284,7 +284,7 @@ public class MessageHandler {
     }
 
     public void checkPayment(Long chatId, Integer messageId, String transactionId, Integer amount, User user) {
-        boolean isPaid = true;
+        boolean isPaid = false;
 
         if (!isPaid) {
             String oldText = String.format("""
