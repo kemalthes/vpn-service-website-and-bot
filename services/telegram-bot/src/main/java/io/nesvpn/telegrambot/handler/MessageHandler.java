@@ -7,11 +7,13 @@ import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.enums.PaymentStatus;
 import io.nesvpn.telegrambot.enums.TransactionType;
 import io.nesvpn.telegrambot.model.*;
+import io.nesvpn.telegrambot.rabbit.LinkRequestProducer;
 import io.nesvpn.telegrambot.services.*;
 import io.nesvpn.telegrambot.services.ReferralService;
 import io.nesvpn.telegrambot.util.DisplayTelegramUsername;
 import io.nesvpn.telegrambot.util.Formatter;
 import io.nesvpn.telegrambot.util.KeyboardFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -37,6 +39,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class MessageHandler {
 
@@ -48,6 +51,7 @@ public class MessageHandler {
     private final BalanceService balanceService;
     private final TokenService tokenService;
     private final VpnPlanService vpnPlanService;
+    private final LinkRequestProducer linkRequestProducer;
     private final OrderService orderService;
     private final FloatRatesService floatRatesService;
     private final TonPaymentService tonPaymentService;
@@ -62,12 +66,12 @@ public class MessageHandler {
             BalanceService balanceService,
             TokenService tokenService,
             VpnPlanService vpnPlanService,
+            @Lazy VpnBot vpnBot, LinkRequestProducer linkRequestProducer,
             OrderService orderService,
             FloatRatesService floatRatesService,
             TonPaymentService tonPaymentService,
             PaymentService paymentService,
-            CooldownService cooldownService,
-            @Lazy VpnBot vpnBot
+            CooldownService cooldownService
     ) {
         this.userService = userService;
         this.telegramUserService = telegramUserService;
@@ -82,6 +86,7 @@ public class MessageHandler {
         this.paymentService = paymentService;
         this.cooldownService = cooldownService;
         this.vpnBot = vpnBot;
+        this.linkRequestProducer = linkRequestProducer;
     }
 
     public void handle(Message message) {
@@ -1284,7 +1289,7 @@ public class MessageHandler {
         } else {
             long daysLeft = tokenService.getDaysLeft(token);
             boolean isActive = token.isActive();
-            String tokenUrl = token.getToken();
+            String tokenUrl = tokenService.getFullTokenUrl(token);
 
             String statusEmoji = isActive ? "✅" : "❌";
             String statusText = isActive ? "Активна" : "Истекла";
@@ -1300,7 +1305,7 @@ public class MessageHandler {
                         📅 <b>Действует до:</b> %s
                         ⏳ <b>Осталось дней:</b> %d
                         
-                        👥 <b>Устройств всего:</b> 5%s
+                        👥 <b>Устройств всего:</b> 3%s
                         
                         <i></i>
                         """,
@@ -1348,7 +1353,7 @@ public class MessageHandler {
 
         if (token == null) {
             String text = """
-            ❌ <b>Продление подписка</b>
+            ❌ <b>Продление подписки</b>
             
             У вас нет активной подписки, вернитесь назад:
             """;
@@ -1590,10 +1595,7 @@ public class MessageHandler {
             """;
 
         Order order = orderService.createOrder(user.getId(), plan);
-
-        // TODO: Async обработка продления через API
-        // user.getId(), order.getId(), plan.getId()
-
+        log.info("Заказ {} cоздан", order.getId());
         try {
             if (messageId != null) {
                 EditMessageText editMessage = new EditMessageText();

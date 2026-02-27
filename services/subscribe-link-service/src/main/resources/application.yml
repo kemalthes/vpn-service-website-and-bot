@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: subscribe-link-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/vpn_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+  liquibase:
+    enabled: false
+    change-log: classpath:db/changelog-master.xml
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+project:
+  limit-devices: 5
+  limit-devices-free: 3
+  traffic-limit-free: 30L * 1024 * 1024 * 1024
+  days-limit: 1
+
+remnawave:
+  url: ${VPN_PANEL_DOMAIN}
+  key: ${VPN_PANEL_BEARER}
+  squad-uuid: ${VPN_PANEL_SQUAD_UUID}

@@ -1,0 +1,40 @@
+services:
+  localRabbitmq:
+    container_name: local_rabbit
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-password}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  telegram-bot:
+    container_name: nesvpn_telegram_bot
+    env_file:
+      - .env
+    build:
+      context: ./services/telegram-bot
+    depends_on:
+      localRabbitmq:
+        condition: service_healthy
+
+  link-service:
+    container_name: nesvpn_link_service
+    env_file:
+      - .env
+    build:
+      context: ./services/subscribe-link-service
+    depends_on:
+      localRabbitmq:
+        condition: service_healthy
+
+volumes:
+  rabbitmq_data:

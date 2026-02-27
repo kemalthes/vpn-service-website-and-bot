@@ -9,5 +9,4 @@ public class SubscribeLinkServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(SubscribeLinkServiceApplication.class, args);
     }
-
 }

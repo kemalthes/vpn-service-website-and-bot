@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 14-alter-token-order-status
+      author: kemalthes
+      changes:
+        - sql:
+            sql: ALTER TABLE tokens DROP CONSTRAINT IF EXISTS ch_tokens_status;
+        - sql:
+            sql: ALTER TABLE tokens ADD CONSTRAINT ch_tokens_status CHECK (status IN ('ACTIVE', 'DISABLED'));
+        - sql:
+            sql: ALTER TABLE orders DROP CONSTRAINT IF EXISTS ch_orders_status;
+        - sql:
+            sql: ALTER TABLE orders ADD CONSTRAINT ch_orders_status CHECK (status IN ('PENDING', 'PAID', 'CANCELLED', 'PROVIDED'));
