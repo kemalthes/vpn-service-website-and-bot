@@ -5,6 +5,7 @@ import io.nesvpn.subscribelinkservice.entity.Order;
 import io.nesvpn.subscribelinkservice.entity.Token;
 import io.nesvpn.subscribelinkservice.entity.User;
 import io.nesvpn.subscribelinkservice.entity.VpnPlan;
+import io.nesvpn.subscribelinkservice.enums.OrderStatus;
 import io.nesvpn.subscribelinkservice.exception.IdempotentException;
 import io.nesvpn.subscribelinkservice.repository.OrderRepository;
 import io.nesvpn.subscribelinkservice.repository.TokenRepository;
@@ -57,7 +58,7 @@ class UpdateTokenServiceTest {
                 .vpnPanelUserUuid(UUID.fromString("550e8400-e29b-41d4-a716-446655440001"))
                 .validTo(LocalDateTime.now())
                 .build();
-        order = Order.builder().id(1L).status("paid").build();
+        order = Order.builder().id(1L).status(OrderStatus.PAID).build();
         plan = VpnPlan.builder().id(1L).duration(30).build();
     }
 
@@ -79,7 +80,7 @@ class UpdateTokenServiceTest {
 
     @Test
     void process_ShouldThrowIdempotentException_WhenOrderNotPaid_ForIdempotency() {
-        order.setStatus("pending");  // НЕ paid
+        order.setStatus(OrderStatus.PENDING);
         when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
         RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> updateTokenService.process(userId, 1L, 1L).block());

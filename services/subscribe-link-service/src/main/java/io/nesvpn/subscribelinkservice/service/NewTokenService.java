@@ -80,4 +80,5 @@ public class NewTokenService {
                 .doOnError(ex -> log.error("[NewTokenService] Критическая ошибка в процессе создания токена для юзера {}. Причина: {}", userId, ex.getMessage(), ex))
                 .onErrorMap(ex -> new RuntimeException("Token creation failed", ex));
     }
+
 }

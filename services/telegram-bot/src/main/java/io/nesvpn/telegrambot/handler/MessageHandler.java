@@ -105,6 +105,8 @@ public class MessageHandler {
             handleInstructions(message);
         } else if (text.equals("/balance")) {
             handleBalance(message);
+        } else if (text.equals("/info")) {
+            handleAboutService(message);
         } else {
             TelegramUser telegramUser = telegramUserService.findOrCreate(message.getFrom().getId());
 
@@ -166,6 +168,17 @@ public class MessageHandler {
         User user = userService.findOrCreateByTgId(userId);
 
         showProfile(chatId, null, user);
+    }
+
+    private void handleAboutService(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.INFO);
+        User user = userService.findOrCreateByTgId(userId);
+
+        showAboutService(chatId, null);
     }
 
     private void handleReferrals(Message message) {
@@ -383,6 +396,45 @@ public class MessageHandler {
                 sendMessage.setText(text);
                 sendMessage.setReplyMarkup(keyboardFactory.getTopUpMenuInline());
                 sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showAboutService(Long chatId, Integer messageId) {
+        telegramUserService.updateState(chatId, BotState.INFO, BotState.START);
+
+        String text = """
+            <b>Юридическая информация</b>
+            
+            Используя наш сервис, вы подтверждаете, что ознакомились и соглашаетесь со следующими документами:
+        
+            • <a href="https://telegra.ph/Politika-konfidencialnosti-08-15-17" target="_blank">Политика конфиденциальности</a>
+            
+            • <a href="https://telegra.ph/Polzovatelskoe-soglashenie-08-15-10" target="_blank">Пользовательское соглашение</a>
+            
+            Продолжая пользоваться ботом и сервисом, вы принимаете условия указанных документов.
+            """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getInfoButton());
+                editMessage.setDisableWebPagePreview(true);
+                editMessage.setParseMode("HTML");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getInfoButton());
+                sendMessage.setDisableWebPagePreview(true);
+                sendMessage.setParseMode("HTML");
                 vpnBot.execute(sendMessage);
             }
         } catch (TelegramApiException e) {
@@ -736,11 +788,11 @@ public class MessageHandler {
         String text = String.format("""
         👋 Добро пожаловать в *NesVPN*, *%s*
         
-        🔐 *Быстрый, безопасный и стабильный VPN для обхода блокировок*
+        🔐 *Быстрый, безопасный и стабильный VPN для повседневного использования*
         
         ⚡️ *Преимущества:*
         _• Высокая скорость соединения_
-        _• Обход белых списков_
+        _• Работает в исключительных ситуациях_
         _• Низкая цена_
         _• Поддержка всех устройств_
         _• Бесплатный тестовый период_

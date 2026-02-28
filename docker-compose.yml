@@ -2,6 +2,8 @@ services:
   localRabbitmq:
     container_name: local_rabbit
     image: rabbitmq:3-management-alpine
+    env_file:
+      - .env
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-user}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-password}

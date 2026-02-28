@@ -85,6 +85,9 @@ public class CallbackQueryHandler {
             case "subscription_extend" -> {
                 messageHandler.showSubscriptionExtend(chatId, messageId, user);
             }
+            case "info" -> {
+                messageHandler.showAboutService(chatId, messageId);
+            }
         }
 
         if (data.startsWith("check_payment_sbp")) {

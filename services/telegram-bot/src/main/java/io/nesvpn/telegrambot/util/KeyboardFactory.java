@@ -15,6 +15,9 @@ public class KeyboardFactory {
     @Value("${bot.channel.username}")
     private String channelUsername;
 
+    @Value("${bot.support}")
+    private String support;
+
     public InlineKeyboardMarkup getMainMenuInline() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -44,11 +47,18 @@ public class KeyboardFactory {
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton infoBtn = new InlineKeyboardButton();
+        infoBtn.setText("\uD83C\uDF10 О сервисe");
+        infoBtn.setCallbackData("info");
+        row3.add(infoBtn);
+        rows.add(row3);
+
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
         InlineKeyboardButton instructionBtn = new InlineKeyboardButton();
         instructionBtn.setText("📖 Инструкция");
         instructionBtn.setCallbackData("instructions");
-        row3.add(instructionBtn);
-        rows.add(row3);
+        row4.add(instructionBtn);
+        rows.add(row4);
 
         markup.setKeyboard(rows);
         return markup;
@@ -150,6 +160,40 @@ public class KeyboardFactory {
 
         keyboard.setKeyboard(rows);
         return keyboard;
+    }
+
+    public InlineKeyboardMarkup getInfoButton() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton privacyButton = new InlineKeyboardButton();
+        privacyButton.setText("\uD83D\uDCDC Политика конфиденциальности");
+        privacyButton.setUrl("https://telegra.ph/Politika-konfidencialnosti-08-15-17");
+        row1.add(privacyButton);
+
+        InlineKeyboardButton agreementButton = new InlineKeyboardButton();
+        agreementButton.setText("\uD83D\uDCD8 Пользовательское соглашение");
+        agreementButton.setUrl("https://telegra.ph/Polzovatelskoe-soglashenie-08-15-10");
+        row1.add(agreementButton);
+        rows.add(row1);
+
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton supportButton = new InlineKeyboardButton();
+        supportButton.setText("\uD83D\uDCAC Поддержка NesVPN");
+        supportButton.setUrl("t.me/" + support);
+        row2.add(supportButton);
+        rows.add(row2);
+
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton();
+        backBtn.setText("◀️ Назад");
+        backBtn.setCallbackData("back");
+        row3.add(backBtn);
+        rows.add(row3);
+
+        markup.setKeyboard(rows);
+        return markup;
     }
 
     public InlineKeyboardMarkup getBackButton() {
