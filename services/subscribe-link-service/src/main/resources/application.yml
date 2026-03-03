@@ -12,10 +12,10 @@ spring:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
 project:
-  limit-devices: 5
+  limit-devices: 3
   limit-devices-free: 3
-  traffic-limit-free: 30L * 1024 * 1024 * 1024
-  days-limit: 1
+  traffic-limit-free: 10L * 1024 * 1024 * 1024
+  days-limit: 2
 
 remnawave:
   url: ${VPN_PANEL_DOMAIN}
