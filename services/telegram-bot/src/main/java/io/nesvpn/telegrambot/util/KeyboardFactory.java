@@ -2,19 +2,21 @@ package io.nesvpn.telegrambot.util;
 
 import io.nesvpn.telegrambot.dto.CryptoPayment;
 import io.nesvpn.telegrambot.model.VpnPlan;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Component
 public class KeyboardFactory {
+    @Value("${bot.channel.username}")
+    private String channelUsername;
+
+    @Value("${bot.support}")
+    private String support;
 
     public InlineKeyboardMarkup getMainMenuInline() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -45,11 +47,18 @@ public class KeyboardFactory {
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton infoBtn = new InlineKeyboardButton();
+        infoBtn.setText("\uD83C\uDF10 О сервисe");
+        infoBtn.setCallbackData("info");
+        row3.add(infoBtn);
+        rows.add(row3);
+
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
         InlineKeyboardButton instructionBtn = new InlineKeyboardButton();
         instructionBtn.setText("📖 Инструкция");
         instructionBtn.setCallbackData("instructions");
-        row3.add(instructionBtn);
-        rows.add(row3);
+        row4.add(instructionBtn);
+        rows.add(row4);
 
         markup.setKeyboard(rows);
         return markup;
@@ -132,6 +141,59 @@ public class KeyboardFactory {
         keyboard.setKeyboard(rows);
 
         return keyboard;
+    }
+
+    public InlineKeyboardMarkup getSubscribeChannelKeyboard() {
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        String channelLink = "https://t.me/" + channelUsername;
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+
+        InlineKeyboardButton titleButton = new InlineKeyboardButton();
+        titleButton.setText("📢 Подписаться на канал");
+        titleButton.setUrl(channelLink);
+        row1.add(titleButton);
+
+        rows.add(row1);
+
+        keyboard.setKeyboard(rows);
+        return keyboard;
+    }
+
+    public InlineKeyboardMarkup getInfoButton() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton privacyButton = new InlineKeyboardButton();
+        privacyButton.setText("\uD83D\uDCDC Политика конфиденциальности");
+        privacyButton.setUrl("https://telegra.ph/Politika-konfidencialnosti-08-15-17");
+        row1.add(privacyButton);
+
+        InlineKeyboardButton agreementButton = new InlineKeyboardButton();
+        agreementButton.setText("\uD83D\uDCD8 Пользовательское соглашение");
+        agreementButton.setUrl("https://telegra.ph/Polzovatelskoe-soglashenie-08-15-10");
+        row1.add(agreementButton);
+        rows.add(row1);
+
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton supportButton = new InlineKeyboardButton();
+        supportButton.setText("\uD83D\uDCAC Поддержка NesVPN");
+        supportButton.setUrl("t.me/" + support);
+        row2.add(supportButton);
+        rows.add(row2);
+
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton();
+        backBtn.setText("◀️ Назад");
+        backBtn.setCallbackData("back");
+        row3.add(backBtn);
+        rows.add(row3);
+
+        markup.setKeyboard(rows);
+        return markup;
     }
 
     public InlineKeyboardMarkup getBackButton() {

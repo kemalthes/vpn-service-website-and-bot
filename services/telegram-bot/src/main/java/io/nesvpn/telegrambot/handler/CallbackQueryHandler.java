@@ -73,7 +73,8 @@ public class CallbackQueryHandler {
                 messageHandler.showTopUp(chatId, messageId);
             }
             case "payment_method_sbp" -> {
-                messageHandler.showAwaitingBalance(chatId, messageId, user);
+                messageHandler.showAwaitingBalanceDev(chatId, messageId, user);
+//                messageHandler.showAwaitingBalance(chatId, messageId, user);
             }
             case "payment_method_usdt" -> {
                 messageHandler.showAwaitingBalanceWithCrypto(chatId, messageId, user);
@@ -83,6 +84,9 @@ public class CallbackQueryHandler {
             }
             case "subscription_extend" -> {
                 messageHandler.showSubscriptionExtend(chatId, messageId, user);
+            }
+            case "info" -> {
+                messageHandler.showAboutService(chatId, messageId);
             }
         }
 

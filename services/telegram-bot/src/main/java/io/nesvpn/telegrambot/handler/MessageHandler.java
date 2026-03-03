@@ -71,8 +71,7 @@ public class MessageHandler {
             FloatRatesService floatRatesService,
             TonPaymentService tonPaymentService,
             PaymentService paymentService,
-            CooldownService cooldownService
-    ) {
+            CooldownService cooldownService) {
         this.userService = userService;
         this.telegramUserService = telegramUserService;
         this.referralService = referralService;
@@ -92,6 +91,10 @@ public class MessageHandler {
     public void handle(Message message) {
         String text = message.getText();
 
+        if (!telegramUserService.existsByTgId(message.getFrom().getId())) {
+            showSubscribeChannel(message.getChatId(), null);
+        }
+
         if (text.startsWith("/start")) {
             handleStart(message);
         } else if (text.equals("/profile")) {
@@ -102,6 +105,8 @@ public class MessageHandler {
             handleInstructions(message);
         } else if (text.equals("/balance")) {
             handleBalance(message);
+        } else if (text.equals("/info")) {
+            handleAboutService(message);
         } else {
             TelegramUser telegramUser = telegramUserService.findOrCreate(message.getFrom().getId());
 
@@ -142,7 +147,7 @@ public class MessageHandler {
                 sendMessage(referrer.getTgId(),
                         String.format(
                                 "🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!\n" +
-                                        "💰 С его покупок вы будете получать по 20%% на баланс\n\n" +
+                                        "💰 С его покупок вы будете получать по 10%% на баланс\n\n" +
                                         "👤 Пользователь: %s (ID: %d)",
                                 displayName != null ? displayName : "Новый пользователь",
                                 user.getTgId()
@@ -163,6 +168,17 @@ public class MessageHandler {
         User user = userService.findOrCreateByTgId(userId);
 
         showProfile(chatId, null, user);
+    }
+
+    private void handleAboutService(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.INFO);
+        User user = userService.findOrCreateByTgId(userId);
+
+        showAboutService(chatId, null);
     }
 
     private void handleReferrals(Message message) {
@@ -284,7 +300,7 @@ public class MessageHandler {
     }
 
     public void checkPayment(Long chatId, Integer messageId, String transactionId, Integer amount, User user) {
-        boolean isPaid = true;
+        boolean isPaid = false;
 
         if (!isPaid) {
             String oldText = String.format("""
@@ -380,6 +396,45 @@ public class MessageHandler {
                 sendMessage.setText(text);
                 sendMessage.setReplyMarkup(keyboardFactory.getTopUpMenuInline());
                 sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void showAboutService(Long chatId, Integer messageId) {
+        telegramUserService.updateState(chatId, BotState.INFO, BotState.START);
+
+        String text = """
+            <b>Юридическая информация</b>
+            
+            Используя наш сервис, вы подтверждаете, что ознакомились и соглашаетесь со следующими документами:
+        
+            • <a href="https://telegra.ph/Politika-konfidencialnosti-08-15-17" target="_blank">Политика конфиденциальности</a>
+            
+            • <a href="https://telegra.ph/Polzovatelskoe-soglashenie-08-15-10" target="_blank">Пользовательское соглашение</a>
+            
+            Продолжая пользоваться ботом и сервисом, вы принимаете условия указанных документов.
+            """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getInfoButton());
+                editMessage.setDisableWebPagePreview(true);
+                editMessage.setParseMode("HTML");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getInfoButton());
+                sendMessage.setDisableWebPagePreview(true);
+                sendMessage.setParseMode("HTML");
                 vpnBot.execute(sendMessage);
             }
         } catch (TelegramApiException e) {
@@ -733,11 +788,11 @@ public class MessageHandler {
         String text = String.format("""
         👋 Добро пожаловать в *NesVPN*, *%s*
         
-        🔐 *Быстрый, безопасный и стабильный VPN для обхода блокировок*
+        🔐 *Быстрый, безопасный и стабильный VPN для повседневного использования*
         
         ⚡️ *Преимущества:*
         _• Высокая скорость соединения_
-        _• Обход белых списков_
+        _• Работает в исключительных ситуациях_
         _• Низкая цена_
         _• Поддержка всех устройств_
         _• Бесплатный тестовый период_
@@ -858,7 +913,7 @@ public class MessageHandler {
         <b>👥 Реферальная программа NesVPN</b>
 
         <b>💎 Как это работает:</b>
-        • Каждый друг по вашей ссылке = <b>20%% от суммы</b> каждой покупки
+        • Каждый друг по вашей ссылке = <b>10%% от суммы</b> каждой покупки
         • Деньги с покупок рефералов <b>начисляются вам на баланс</b> автоматически
         • <b>Друг получит 50 рублей</b> на баланс
         • <b>Нет ограничений</b> по количеству приглашенных
@@ -1180,6 +1235,37 @@ public class MessageHandler {
         }
     }
 
+    public void showAwaitingBalanceDev(Long chatId, Integer messageId, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.BALANCE_TOP_UP, BotState.BALANCE_TOP_UP);
+
+        String text = """
+        💰 *Пополнение баланса по СБП*
+        
+        Данный раздел находится в разработке, для пополнения *обратитесь к администратору* или используйте *другие способы оплаты*.
+        """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text);
+                editMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                editMessage.setParseMode("Markdown");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getBackButton());
+                sendMessage.setParseMode("Markdown");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void showAwaitingBalance(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT, BotState.BALANCE_TOP_UP);
 
@@ -1251,6 +1337,34 @@ public class MessageHandler {
         }
     }
 
+    public void showSubscribeChannel(Long chatId, Integer messageId) {
+        String text = """
+            📱 <b>Рекомендуем подписаться на канал</b>
+            
+            <i>💡 Чтобы быть в курсе всех новостей и анонсов, просим подписаться</i>
+            """;
+
+        try {
+            if (messageId != null) {
+                EditMessageText editMessage = new EditMessageText();
+                editMessage.setChatId(chatId);
+                editMessage.setMessageId(messageId);
+                editMessage.setText(text.trim());
+                editMessage.setReplyMarkup(keyboardFactory.getSubscribeChannelKeyboard());
+                editMessage.setParseMode("HTML");
+                vpnBot.execute(editMessage);
+            } else {
+                SendMessage sendMessage = new SendMessage();
+                sendMessage.setChatId(chatId);
+                sendMessage.setText(text);
+                sendMessage.setReplyMarkup(keyboardFactory.getSubscribeChannelKeyboard());
+                sendMessage.setParseMode("HTML");
+                vpnBot.execute(sendMessage);
+            }
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void showSubscription(Long chatId, Integer messageId, User user) {
         Long tgId = user.getTgId();

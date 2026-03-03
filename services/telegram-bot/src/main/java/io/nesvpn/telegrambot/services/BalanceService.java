@@ -45,7 +45,7 @@ public class BalanceService {
                     .orElse(null);
 
             if (referrer != null) {
-                BigDecimal bonus = purchaseAmount.multiply(new BigDecimal("0.20"));
+                BigDecimal bonus = purchaseAmount.multiply(new BigDecimal("0.10"));
 
                 referrer.setBalance(referrer.getBalance().add(bonus));
                 userRepository.save(referrer);
@@ -55,7 +55,7 @@ public class BalanceService {
                 referralTx.setAmount(bonus);
                 referralTx.setType(TransactionType.REFERRAL_BONUS);
                 referralTx.setDescription(
-                        String.format("20%% с покупки друга id: %s (%.2f₽)",
+                        String.format("10%% с покупки друга id: %s (%.2f₽)",
                                 buyer.getTgId(), purchaseAmount)
                 );
                 referralTx.setReferralId(buyer.getId());
