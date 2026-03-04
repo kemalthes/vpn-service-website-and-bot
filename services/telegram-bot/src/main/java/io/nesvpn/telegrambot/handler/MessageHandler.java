@@ -108,6 +108,8 @@ public class MessageHandler {
             handleInstructions(message);
         } else if (text.equals("/balance")) {
             handleBalance(message);
+        } else if (text.equals("/subscriptions")) {
+            hanldeSubscription(message);
         } else if (text.equals("/info")) {
             handleAboutService(message);
         } else {
@@ -217,6 +219,17 @@ public class MessageHandler {
 
         User user = userService.findOrCreateByTgId(userId);
         showInstructions(chatId, null, user);
+    }
+
+    private void hanldeSubscription(Message message) {
+        Long chatId = message.getChatId();
+        Long userId = message.getFrom().getId();
+
+        telegramUserService.findOrCreate(userId);
+        telegramUserService.setState(userId, BotState.SUBSCRIPTIONS);
+
+        User user = userService.findOrCreateByTgId(userId);
+        showSubscription(chatId, null, user);
     }
 
     public void handleAmountInput(Message message) {
@@ -943,20 +956,20 @@ public class MessageHandler {
         telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_IOS, BotState.INSTRUCTIONS);
 
         String text = """
-        🔐 *iOS — Clash Mi*
+        🔐 *iOS — Karing*
 
-        _Шаг 1:_ Скачайте *Clash Mi* из App Store
-        🔗 [Скачать Clash Mi](https://apps.apple.com/us/app/clash-mi/id6744321968)
+        _Шаг 1:_ Скачайте *Karing* из App Store
+        🔗 [Скачать Karing](https://apps.apple.com/ru/app/karing/id6472431552)
 
         _Шаг 2:_ Откройте Telegram → Скопируйте *ссылку на подписку*
 
-        _Шаг 3:_ Откройте *Clash Mi*: *Вставьте ссылку в: Профили -> Нажмите на + -> Добавление подписки* и *ОБЯЗАТЕЛЬНО* выберите *"X-HWID"* - должен быть включен
+        _Шаг 3:_ Откройте *Karing*: *Вставьте ссылку в: Профили -> 3 точки наверху справа -> Добавить профиль -> Импорт из буфера обмена* и *ОБЯЗАТЕЛЬНО* выберите *"X-HWID"* - должен быть включен
 
         _Шаг 4:_ iOS запросит разрешение VPN → *"Разрешить"*
 
-        _Шаг 5:_ Нажмите *"Подключиться"* на главной странице, менять сервера по кнопке: *Прокси* или *Панель* -> *NesVPN и дальше выбираете* ✅
+        _Шаг 5:_ Нажмите *"Подключиться"* на главной странице снизу, менять сервера по кнопке снизу под подключением: листаете в самый низ там будет *kclash.nesvpn.sbs* -> *и дальше выбираете страны* ✅
 
-        ⚠️ *Важно:* Проверьте, что конфиг импортировался в разделе _Профили_ и есть несколько серверов, пропингуйте их
+        ⚠️ *Важно:* Проверьте, что конфиг импортировался в разделе _Профили_ и есть несколько серверов, которые описаны в шаге 5, пропингуйте их
 
         💡 *Проблемы?*
         • Проверьте срок подписки и количество устройств в боте
