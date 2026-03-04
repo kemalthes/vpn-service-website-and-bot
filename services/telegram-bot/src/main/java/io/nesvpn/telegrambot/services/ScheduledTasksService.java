@@ -1,6 +1,7 @@
 package io.nesvpn.telegrambot.services;
 
 import io.nesvpn.telegrambot.dto.CryptoPayment;
+import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.handler.MessageHandler;
 import io.nesvpn.telegrambot.handler.VpnBot;
 import io.nesvpn.telegrambot.model.Payment;
@@ -37,12 +38,11 @@ public class ScheduledTasksService {
 
         for (Payment payment : pendingPayments) {
             try {
-                boolean confirmed = tonPaymentService.checkTransactionInBlockchain(payment);
+                boolean confirmed = paymentService.checkAndConfirmPayment(payment);
                 if (confirmed) {
-                    paymentService.confirmPayment(payment.getTransactionToken());
                     User user = userService.getUserById(payment.getUserId());
                     if (user != null) {
-                        messageHandler.showSuccessPayment(user.getTgId(), tonPaymentService.createUsdtPayment(payment), user);
+                        messageHandler.showSuccessPayment(user.getTgId(), payment, user);
                     }
                 }
             } catch (Exception e) {

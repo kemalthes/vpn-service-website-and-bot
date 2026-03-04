@@ -1,5 +1,6 @@
 package io.nesvpn.telegrambot.services;
 
+import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.enums.TransactionType;
 import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.enums.PaymentStatus;
@@ -25,20 +26,18 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final TonPaymentService tonPaymentService;
     private final BalanceService balanceService;
+    private final PlategaService plategaService;
 
     @Transactional
-    public Payment createPayment(UUID userId, double amount, String method, String currency) {
+    public Payment createPayment(UUID userId, double amount, String method, String currency, String transactionToken, LocalDateTime expiresAt) {
         List<Payment> pendingPayments = paymentRepository.findByUserIdAndStatus(
                 userId,
                 PaymentStatus.PENDING.getValue()
         );
 
         if (pendingPayments.size() < 5) {
-
             BigDecimal roundedAmount = BigDecimal.valueOf(amount)
                     .setScale(2, RoundingMode.HALF_UP);
-
-            LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
 
             Payment payment = Payment.builder()
                 .userId(userId)
@@ -48,14 +47,13 @@ public class PaymentService {
                 .currency(currency)
                 .paymentDate(null)
                 .expiresAt(expiresAt)
-                .transactionToken(generateTransactionToken())
+                .transactionToken(transactionToken)
                 .build();
 
             return paymentRepository.save(payment);
         }
 
         return null;
-
     }
 
     public Optional<Payment> getPaymentByToken(String token) {
@@ -66,20 +64,8 @@ public class PaymentService {
         return paymentRepository.findByUserIdAndStatus(userId, PaymentStatus.PENDING.getValue());
     }
 
-    private String generateTransactionToken() {
-        return UUID.randomUUID().toString().substring(0, 18);
-    }
-
     @Transactional
-    public boolean checkAndConfirmCryptoPayment(String transactionToken) {
-        Optional<Payment> paymentOpt = paymentRepository.findByTransactionToken(transactionToken);
-
-        if (paymentOpt.isEmpty()) {
-            return false;
-        }
-
-        Payment payment = paymentOpt.get();
-
+    public boolean checkAndConfirmPayment(Payment payment) {
         if (LocalDateTime.now().isAfter(payment.getExpiresAt())) {
             payment.setStatus(PaymentStatus.EXPIRED.getValue());
             paymentRepository.save(payment);
@@ -90,7 +76,14 @@ public class PaymentService {
             return true;
         }
 
-        boolean isPaid = tonPaymentService.checkTransactionInBlockchain(payment);
+
+        boolean isPaid = false;
+
+        if (payment.getMethod().equals(PaymentMethod.CRYPTO.getValue())) {
+            isPaid = tonPaymentService.checkTransactionInBlockchain(payment);
+        } else {
+            isPaid = plategaService.checkPayment(payment);
+        }
 
         if (isPaid) {
             confirmPaymentAndUpdateBalance(payment);
@@ -165,8 +158,18 @@ public class PaymentService {
         payment.setStatus(PaymentStatus.COMPLETED.getValue());
         payment.setPaymentDate(LocalDateTime.now());
         paymentRepository.save(payment);
-        balanceService.addBalance(payment.getUserId(), BigDecimal.valueOf(tonPaymentService.createUsdtPayment(payment).getAmountRub()),
-                TransactionType.TOP_UP, "Пополнение баланса через USDT");
+        BigDecimal amount = BigDecimal.ZERO;
+        String description = "Пополнение";
+
+        if (payment.getMethod().equals(PaymentMethod.CRYPTO.getValue())) {
+            amount = BigDecimal.valueOf(tonPaymentService.createUsdtPayment(payment).getAmountRub());
+            description = "Пополнение баланса через USDT";
+        } else if  (payment.getMethod().equals(PaymentMethod.SBP.getValue())) {
+            amount = payment.getAmount();
+            description = "Пополнение баланса через СБП";
+        }
+        balanceService.addBalance(payment.getUserId(), amount,
+                TransactionType.TOP_UP, description);
     }
 
     public List<Payment> getPendingPayments() {

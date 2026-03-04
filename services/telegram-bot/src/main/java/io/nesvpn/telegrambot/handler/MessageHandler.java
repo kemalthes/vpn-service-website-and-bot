@@ -2,6 +2,7 @@ package io.nesvpn.telegrambot.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nesvpn.telegrambot.dto.CryptoPayment;
+import io.nesvpn.telegrambot.dto.PlategaCreateResponse;
 import io.nesvpn.telegrambot.enums.BotState;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.enums.PaymentStatus;
@@ -10,9 +11,7 @@ import io.nesvpn.telegrambot.model.*;
 import io.nesvpn.telegrambot.rabbit.LinkRequestProducer;
 import io.nesvpn.telegrambot.services.*;
 import io.nesvpn.telegrambot.services.ReferralService;
-import io.nesvpn.telegrambot.util.DisplayTelegramUsername;
-import io.nesvpn.telegrambot.util.Formatter;
-import io.nesvpn.telegrambot.util.KeyboardFactory;
+import io.nesvpn.telegrambot.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -32,7 +31,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
@@ -57,6 +56,8 @@ public class MessageHandler {
     private final TonPaymentService tonPaymentService;
     private final PaymentService paymentService;
     private final CooldownService cooldownService;
+    private final PlategaService plategaService;
+    private final TextFactory textFactory;
 
     public MessageHandler(
             UserService userService,
@@ -71,7 +72,7 @@ public class MessageHandler {
             FloatRatesService floatRatesService,
             TonPaymentService tonPaymentService,
             PaymentService paymentService,
-            CooldownService cooldownService) {
+            CooldownService cooldownService, PlategaService plategaService, TextFactory textFactory) {
         this.userService = userService;
         this.telegramUserService = telegramUserService;
         this.referralService = referralService;
@@ -86,6 +87,8 @@ public class MessageHandler {
         this.cooldownService = cooldownService;
         this.vpnBot = vpnBot;
         this.linkRequestProducer = linkRequestProducer;
+        this.plategaService = plategaService;
+        this.textFactory = textFactory;
     }
 
     public void handle(Message message) {
@@ -246,7 +249,7 @@ public class MessageHandler {
                 return;
             }
 
-            showPayment(chatId, amount, user);
+            showPaymentSbp(chatId, amount, user);
         } catch (NumberFormatException e) {
             sendError(chatId, """
                 ❌ Неверный формат суммы
@@ -296,76 +299,6 @@ public class MessageHandler {
                 """);
 
             showAwaitingBalanceWithCrypto(chatId, null, user);
-        }
-    }
-
-    public void checkPayment(Long chatId, Integer messageId, String transactionId, Integer amount, User user) {
-        boolean isPaid = false;
-
-        if (!isPaid) {
-            String oldText = String.format("""
-            💸 *Пополнение баланса*
-        
-            💰 Сумма: *%d ₽*
-            🆔 ID транзакции: `%s`
-        
-            ℹ️ *Инструкция:*
-            1. Нажмите кнопку "Оплатить" ниже.
-            2. Следуйте указаниям платежной системы.
-            3. После оплаты вернитесь к боту и нажмите "Проверить оплату".
-            """,
-                    amount,
-                    transactionId
-            );
-
-            String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
-
-            String updatedText = oldText +  String.format("""
-        
-            ⏳ *Оплата не найдена* (%s)
-        
-            Платеж еще не поступил или обрабатывается.
-            Пожалуйста, попробуйте снова через 1-2 минуты.
-            """, currentTime);
-
-            EditMessageText editMessage = new EditMessageText();
-            editMessage.setChatId(chatId);
-            editMessage.setMessageId(messageId);
-            editMessage.setText(updatedText);
-            editMessage.setReplyMarkup(keyboardFactory.getPaymentMenuInline(transactionId, amount));
-            editMessage.setParseMode("Markdown");
-
-            try {
-                vpnBot.execute(editMessage);
-            } catch (TelegramApiException e) {
-                e.printStackTrace();
-            }
-
-        } else {
-            balanceService.addBalance(user.getId(), new BigDecimal(amount), TransactionType.TOP_UP, "Пополнение баланса через СБП");
-
-            String successText = String.format("""
-            ✅ *Оплата подтверждена!*
-        
-            💰 Ваш баланс пополнен на *%d₽*
-            📊 Текущий баланс: *%.2f₽*
-        
-            Спасибо за использование нашего сервиса!
-            """, amount, user.getBalance().add(BigDecimal.valueOf(amount)));
-
-            EditMessageText editMessage = new EditMessageText();
-            editMessage.setChatId(chatId);
-            editMessage.setMessageId(messageId);
-            editMessage.setText(successText);
-            editMessage.setReplyMarkup(keyboardFactory.getBackButton());
-            editMessage.setParseMode("Markdown");
-
-            try {
-                vpnBot.execute(editMessage);
-                telegramUserService.updateState(chatId, BotState.PAYMENT_AWAITING_CONFIRMATION, BotState.BALANCE);
-            } catch (TelegramApiException e) {
-                e.printStackTrace();
-            }
         }
     }
 
@@ -442,7 +375,7 @@ public class MessageHandler {
         }
     }
 
-    public void checkPaymentCrypto(Long chatId, Integer messageId, String transactionId, User user) {
+    public void checkPayment(Long chatId, Integer messageId, String transactionId, User user) {
         Optional<Payment> paymentOpt = paymentService.getPaymentByToken(transactionId);
 
         if (paymentOpt.isEmpty()) {
@@ -476,7 +409,7 @@ public class MessageHandler {
             """, currentTime, remaining);
 
             editMessageCaption(chatId, messageId, fullText,
-                    keyboardFactory.getPaymentCheckCryptoKeyboard(payment.getTransactionToken(), null));
+                    keyboardFactory.getPaymentCheckKeyboard(transactionId));
             return;
         }
 
@@ -498,36 +431,9 @@ public class MessageHandler {
             return;
         }
 
-        CryptoPayment cryptoPayment = tonPaymentService.createUsdtPayment(payment);
-        String expiryTime = Formatter.formatExpiryTime(cryptoPayment.getExpiresAt());
+        String baseText = textFactory.checkPaymentText(payment);
 
-        String baseText = String.format("""
-        💸 <b>Пополнение баланса криптовалютой</b>
-
-        💰 Сумма в рублях: <b>%s руб</b>
-        💎 USDT: <code>%s</code> $
-        📝 Memo: <code>%s</code>
-
-        ⏳ <b>Действителен до:</b> %s (по мск)
-
-        🔗 <b>Tonkeeper ссылка: </b>
-        %s
-
-        📱 <b>Инструкция:</b>
-        1️⃣ Нажмите кнопку "🚀 Оплатить"
-        2️⃣ Проверьте сумму и получателя
-        3️⃣ Подтвердите транзакцию в кошельке
-        4️⃣ Нажмите "Проверить оплату" ниже
-
-        ⚠️ <b>Важно:</b> Убедитесь, что memo совпадает!
-        """,
-                cryptoPayment.getAmountRub(),
-                cryptoPayment.getAmountUsdt(),
-                cryptoPayment.getTransactionId(),
-                expiryTime,
-                cryptoPayment.getTonLink());
-
-        boolean isPaid = paymentService.checkAndConfirmCryptoPayment(transactionId);
+        boolean isPaid = paymentService.checkAndConfirmPayment(payment);
 
         if (!isPaid) {
             String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
@@ -543,13 +449,13 @@ public class MessageHandler {
             """, currentTime);
 
             editMessageCaption(chatId, messageId, fullText,
-                    keyboardFactory.getPaymentCheckCryptoKeyboard(cryptoPayment.getTransactionId(), cryptoPayment.getTonLink()));
+                    keyboardFactory.getPaymentCheckKeyboard(transactionId));
 
         } else {
-            editMessageCaption(chatId, messageId, baseText + "\n<b>Мы увидели ее в блокчейне</b>", null);
+            editMessageCaption(chatId, messageId, baseText + "\n<b>Мы увидели ее, обрабатываем!</b>", null);
             if (lastStatus.equals(PaymentStatus.PENDING)) {
                 User updatedUser = userService.getUserById(user.getId());
-                showSuccessPayment(chatId, cryptoPayment, updatedUser);
+                showSuccessPayment(chatId, payment, updatedUser);
             }
         }
     }
@@ -578,19 +484,8 @@ public class MessageHandler {
         }
     }
 
-    public void showSuccessPayment(Long chatId, CryptoPayment cryptoPayment, User user) {
-        String successText = String.format("""
-                                    ✅ <b>Оплата подтверждена!</b>
-                              
-                                    💰 Ваш баланс пополнен на <b>%s ₽</b>
-                                    💎 USDT: <code>%s</code> $
-                                    📊 Текущий баланс: <b>%.2f ₽</b>
-                                    
-                                    Спасибо за использование нашего сервиса!
-                                    """,
-                cryptoPayment.getAmountRub(),
-                cryptoPayment.getAmountUsdt(),
-                user.getBalance());
+    public void showSuccessPayment(Long chatId, Payment payment, User user) {
+        String successText = textFactory.successText(payment, user);
 
         SendMessage successMessage = new SendMessage();
         successMessage.setChatId(chatId.toString());
@@ -608,48 +503,88 @@ public class MessageHandler {
         }
     }
 
-    public void showPayment(Long chatId, int amount, User user) {
+    public void showPaymentSbp(Long chatId, int amount, User user) {
         telegramUserService.updateState(chatId, BotState.PAYMENT_AWAITING_CONFIRMATION, BotState.BALANCE_AWAITING_AMOUNT);
 
-        String transactionId = UUID.randomUUID().toString().substring(0, 8);
-
-        String text = String.format("""
-        💸 *Пополнение баланса*
-    
-        💰 Сумма: *%d ₽*
-        🆔 ID транзакции: `%s`
-    
-        ℹ️ *Инструкция:*
-        1. Нажмите кнопку "Оплатить" ниже.
-        2. Следуйте указаниям платежной системы.
-        3. После оплаты вернитесь к боту и нажмите "Проверить оплату".
-        """,
-                amount,
-                transactionId
-        );
-
         try {
-            SendMessage sendMessage = new SendMessage();
-            sendMessage.setChatId(chatId.toString());
-            sendMessage.setText(text);
-            sendMessage.setReplyMarkup(keyboardFactory.getPaymentMenuInline(transactionId, amount));
-            sendMessage.setParseMode("Markdown");
+            if (paymentService.getUserPendingPayments(user.getId()).size() < 5) {
 
-            vpnBot.execute(sendMessage);
-        } catch (TelegramApiException e) {
+                String currency = "RUB";
+                PlategaCreateResponse plategaResponse = plategaService.createTransaction(
+                    amount,
+                    currency,
+                    "Пополнение баланса NesVPN",
+                    "Пополнение из бота"
+                );
+
+
+                String transactionId = plategaResponse.getTransactionId();
+                String expiresIn = plategaResponse.getExpiresIn();
+                String redirect = plategaResponse.getRedirect();
+
+                LocalTime time = LocalTime.parse(expiresIn);
+
+                LocalDateTime expiresAt = LocalDateTime.now()
+                        .plusHours(time.getHour())
+                        .plusMinutes(time.getMinute())
+                        .plusSeconds(time.getSecond());
+
+                Payment payment = paymentService.createPayment(user.getId(), amount, PaymentMethod.SBP.getValue(), currency, transactionId, expiresAt);
+
+                String caption = textFactory.getPaymentTextSbp(payment);
+
+                byte[] qrcode = Base64.getDecoder().decode(GenerateQrCode.generateQRCode(redirect));
+
+                showPhotoDirectly(chatId, qrcode, caption, keyboardFactory.getPaymentCheckSbpKeyboard(payment));
+
+                return;
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
+
+        telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT_CRYPTO, BotState.BALANCE);
+        showErrorCreatePayment(chatId, user);
     }
 
     public void showPaymentWithCrypto(Long chatId, double amount, User user) {
         try {
-            Payment payment = paymentService.createPayment(user.getId(), amount, PaymentMethod.CRYPTO.getValue(), "USDT");
+            Payment payment = paymentService.createPayment(user.getId(), amount, PaymentMethod.CRYPTO.getValue(), "USDT", UUID.randomUUID().toString(), LocalDateTime.now().plusMinutes(30));
 
             if (payment != null) {
                 CryptoPayment cryptoPayment = tonPaymentService.createUsdtPayment(payment);
                 byte[] qrBytes = Base64.getDecoder().decode(cryptoPayment.getQrCodeBase64());
                 telegramUserService.updateState(chatId, BotState.BALANCE_AWAITING_AMOUNT, BotState.BALANCE_AWAITING_AMOUNT);
-                showPhotoDirectly(chatId, qrBytes, cryptoPayment);
+                String expiryTime = Formatter.formatExpiryTime(cryptoPayment.getExpiresAt());
+
+                String caption = String.format("""
+                💸 <b>Пополнение баланса криптовалютой</b>
+        
+                💰 Сумма в рублях: <b>%s руб</b>
+                💎 USDT: <code>%s</code> $
+                📝 Memo: <code>%s</code>
+        
+                ⏳ <b>Действителен до:</b> %s (по мск)
+        
+                🔗 <b>Tonkeeper ссылка: </b>
+                %s
+        
+                📱 <b>Инструкция:</b>
+                1️⃣ Нажмите кнопку "🚀 Оплатить"
+                2️⃣ Проверьте сумму и получателя
+                3️⃣ Подтвердите транзакцию в кошельке
+                4️⃣ Нажмите "Проверить оплату" ниже
+        
+                ⚠️ <b>Важно:</b> Убедитесь, что memo совпадает!
+                """,
+                        cryptoPayment.getAmountRub(),
+                        cryptoPayment.getAmountUsdt(),
+                        cryptoPayment.getTransactionId(),
+                        expiryTime,
+                        cryptoPayment.getTonLink()
+                );
+
+                showPhotoDirectly(chatId, qrBytes, caption, keyboardFactory.getPaymentCheckKeyboard(payment.getTransactionToken()));
             } else {
                 telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT_CRYPTO, BotState.BALANCE);
                 showErrorCreatePayment(chatId, user);
@@ -687,39 +622,10 @@ public class MessageHandler {
         }
     }
 
-    private void showPhotoDirectly(Long chatId, byte[] qrBytes, CryptoPayment payment) {
+    private void showPhotoDirectly(Long chatId, byte[] qrBytes, String caption, InlineKeyboardMarkup keyboardMarkup) {
         try {
             String botToken = vpnBot.getBotToken();
             String url = "https://api.telegram.org/bot" + botToken + "/sendPhoto";
-
-            String expiryTime = Formatter.formatExpiryTime(payment.getExpiresAt());
-
-            String caption = String.format("""
-        💸 <b>Пополнение баланса криптовалютой</b>
-        
-        💰 Сумма в рублях: <b>%s руб</b>
-        💎 USDT: <code>%s</code> $
-        📝 Memo: <code>%s</code>
-        
-        ⏳ <b>Действителен до:</b> %s (по мск)
-        
-        🔗 <b>Tonkeeper ссылка: </b>
-        %s
-        
-        📱 <b>Инструкция:</b>
-        1️⃣ Нажмите кнопку "🚀 Оплатить"
-        2️⃣ Проверьте сумму и получателя
-        3️⃣ Подтвердите транзакцию в кошельке
-        4️⃣ Нажмите "Проверить оплату" ниже
-        
-        ⚠️ <b>Важно:</b> Убедитесь, что memo совпадает!
-        """,
-                    payment.getAmountRub(),
-                    payment.getAmountUsdt(),
-                    payment.getTransactionId(),
-                    expiryTime,
-                    payment.getTonLink()
-            );
 
             String boundary = "------------------------" + System.currentTimeMillis();
 
@@ -734,7 +640,7 @@ public class MessageHandler {
             writePart(outputStream, boundary, "parse_mode", "HTML");
 
             ObjectMapper mapper = new ObjectMapper();
-            String replyMarkupJson = mapper.writeValueAsString(keyboardFactory.getPaymentCheckCryptoKeyboard(payment.getTransactionId(), payment.getTonLink()));
+            String replyMarkupJson = mapper.writeValueAsString(keyboardMarkup);
             writePart(outputStream, boundary, "reply_markup", replyMarkupJson);
 
             outputStream.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
@@ -1270,7 +1176,7 @@ public class MessageHandler {
         telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT, BotState.BALANCE_TOP_UP);
 
         String text = """
-        💰 *Пополнение баланса*
+        💰 *Пополнение баланса СБП*
         
         Введите сумму пополнения от *100₽* до *2000₽*
         
@@ -1427,7 +1333,10 @@ public class MessageHandler {
                     statusText,
                     tokenUrl,
                     token.getValidTo() != null
-                            ? token.getValidTo().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+                            ? token.getValidTo()
+                                .atZone(ZoneId.systemDefault())
+                                .withZoneSameInstant(ZoneId.of("Europe/Moscow"))
+                                .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
                             : "Не указано",
                     daysLeft,
                     daysLeft <= 7 && daysLeft > 0

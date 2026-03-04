@@ -8,6 +8,7 @@ import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
 import io.nesvpn.telegrambot.dto.CryptoPayment;
 import io.nesvpn.telegrambot.model.Payment;
+import io.nesvpn.telegrambot.util.GenerateQrCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,7 +52,7 @@ public class TonPaymentService {
             String transactionId = payment.getTransactionToken();
 
             String tonLink = generateTonTransferLink(amountUsdt, transactionId);
-            String qrBase64 = generateQRCode(tonLink);
+            String qrBase64 = GenerateQrCode.generateQRCode(tonLink);
 
             long expiresAt = payment.getExpiresAt().atZone(ZoneId.systemDefault())
                     .toInstant()
@@ -87,29 +88,6 @@ public class TonPaymentService {
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to generate payment link", e);
-        }
-    }
-
-    private String generateQRCode(String text) {
-        try {
-            int width = 360;
-            int height = 360;
-
-            BitMatrix bitMatrix = new MultiFormatWriter().encode(
-                    text,
-                    BarcodeFormat.QR_CODE,
-                    width,
-                    height
-            );
-
-            ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
-            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
-
-            byte[] pngData = pngOutputStream.toByteArray();
-            return Base64.getEncoder().encodeToString(pngData);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate QR code", e);
         }
     }
 
