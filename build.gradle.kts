@@ -131,5 +131,6 @@ project(":telegram-bot") {
         implementation("org.telegram:telegrambots:6.9.7.1")
         implementation("commons-codec:commons-codec:1.16.0")
         implementation("org.slf4j:slf4j-api:2.0.9")
+        implementation("org.springframework.boot:spring-boot-starter-web")
     }
 }

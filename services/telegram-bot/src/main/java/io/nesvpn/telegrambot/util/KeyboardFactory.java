@@ -1,7 +1,11 @@
 package io.nesvpn.telegrambot.util;
 
 import io.nesvpn.telegrambot.dto.CryptoPayment;
+import io.nesvpn.telegrambot.enums.PaymentMethod;
+import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.model.VpnPlan;
+import io.nesvpn.telegrambot.services.PaymentService;
+import io.nesvpn.telegrambot.services.TonPaymentService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -9,14 +13,28 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class KeyboardFactory {
+    private final PaymentService paymentService;
+    private final TonPaymentService tonPaymentService;
     @Value("${bot.channel.username}")
     private String channelUsername;
 
     @Value("${bot.support}")
     private String support;
+
+    @Value("${platega.pay-url}")
+    private String plategaPayUrl;
+
+    @Value("${platega.merchant-id}")
+    private String merchantId;
+
+    public KeyboardFactory(PaymentService paymentService, TonPaymentService tonPaymentService) {
+        this.paymentService = paymentService;
+        this.tonPaymentService = tonPaymentService;
+    }
 
     public InlineKeyboardMarkup getMainMenuInline() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
@@ -64,21 +82,45 @@ public class KeyboardFactory {
         return markup;
     }
 
-    public InlineKeyboardMarkup getPaymentMenuInline(String transactionId, Integer amount) {
+    public InlineKeyboardMarkup getPaymentCheckKeyboard(String transactionId) {
+        if (transactionId == null || transactionId.isEmpty()) {
+            return null;
+        }
+
+        Optional<Payment> paymentOpt = paymentService.getPaymentByToken(transactionId);
+
+        if (paymentOpt.isPresent()) {
+            Payment payment = paymentOpt.get();
+
+            PaymentMethod paymentMethod = PaymentMethod.valueOf(payment.getMethod());
+
+            if (paymentMethod.equals(PaymentMethod.CRYPTO)) {
+                return getPaymentCheckCryptoKeyboard(payment);
+            } else if (paymentMethod.equals(PaymentMethod.SBP)) {
+                return getPaymentCheckSbpKeyboard(payment);
+            }
+        }
+
+        return null;
+    }
+
+    public InlineKeyboardMarkup getPaymentCheckSbpKeyboard(Payment payment) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        String url = plategaPayUrl + "?id=" + payment.getTransactionToken() + "&mh=" + merchantId;
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         InlineKeyboardButton payButton = new InlineKeyboardButton();
         payButton.setText("💳 Оплатить");
-        payButton.setUrl("https://example.com/pay/" + transactionId);
+        payButton.setUrl(url);
         row1.add(payButton);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         InlineKeyboardButton checkButton = new InlineKeyboardButton();
         checkButton.setText("🔄 Проверить оплату");
-        checkButton.setCallbackData("check_payment_sbp" + transactionId + "_" + amount);
+        checkButton.setCallbackData("check_payment_sbp" + payment.getTransactionToken());
         row2.add(checkButton);
         rows.add(row2);
 
@@ -117,10 +159,13 @@ public class KeyboardFactory {
         return markup;
     }
 
-    public InlineKeyboardMarkup getPaymentCheckCryptoKeyboard(String transactionId, String tonLink) {
+    public InlineKeyboardMarkup getPaymentCheckCryptoKeyboard(Payment payment) {
+        CryptoPayment cryptoPayment = tonPaymentService.createUsdtPayment(payment);
+
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
+        String tonLink = cryptoPayment.getTonLink();
         if (tonLink != null) {
             List<InlineKeyboardButton> row1 = new ArrayList<>();
             InlineKeyboardButton sendButton = new InlineKeyboardButton();
@@ -134,7 +179,7 @@ public class KeyboardFactory {
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         InlineKeyboardButton checkButton = new InlineKeyboardButton();
         checkButton.setText("🔄 Проверить оплату");
-        checkButton.setCallbackData("check_payment_crypto_" + transactionId);
+        checkButton.setCallbackData("check_payment_crypto_" + payment.getTransactionToken());
         row2.add(checkButton);
         rows.add(row2);
 

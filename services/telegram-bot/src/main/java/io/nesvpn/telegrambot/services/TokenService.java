@@ -34,11 +34,14 @@ public class TokenService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+
         if (token.getValidTo().isBefore(now)) {
             return 0;
         }
 
-        return ChronoUnit.DAYS.between(now, token.getValidTo());
+        long hours = ChronoUnit.HOURS.between(now, token.getValidTo());
+
+        return Math.max(1, Math.round(hours / 24.0));
     }
 
     public Optional<Token> findById(Long id) {

@@ -68,7 +68,7 @@ public class NewTokenService {
                             .token(vpnUrl)
                             .createdAt(now)
                             .status(TokenStatus.ACTIVE)
-                            .validTo(now.plusDays(3))
+                            .validTo(now.plusDays(2))
                             .vpnPanelUserUuid(UUID.fromString(Objects.requireNonNull(vpnUserUuid)))
                             .build();
                     log.debug("[NewTokenService] Сохраняем токен в базу данных...");
