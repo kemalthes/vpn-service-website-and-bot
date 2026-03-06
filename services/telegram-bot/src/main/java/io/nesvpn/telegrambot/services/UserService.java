@@ -2,18 +2,15 @@ package io.nesvpn.telegrambot.services;
 
 import io.nesvpn.telegrambot.model.Order;
 import io.nesvpn.telegrambot.model.User;
-import io.nesvpn.telegrambot.rabbit.LinkRequestProducer;
 import io.nesvpn.telegrambot.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -48,6 +45,10 @@ public class UserService {
 
     public User getUserById(UUID userId) {
         return userRepository.findById(userId).orElse(null);
+    }
+
+    public List<User> getUsersByIds(List<UUID> userIds) {
+        return userRepository.findAllByIdIn(userIds);
     }
 
     public User findByReferralCode(String referralCode) {

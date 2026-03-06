@@ -45,3 +45,6 @@ databaseChangeLog:
   - include:
       file: dml/20260227-insert-free-vpn-plan.yml
       relativeToChangelogFile: true
+  - include:
+      file: ddl/20260305-add-indexes-for-scheduled.yml
+      relativeToChangelogFile: true

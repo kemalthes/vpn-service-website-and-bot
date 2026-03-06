@@ -1,0 +1,64 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: telegram-bot
+  profiles:
+    active: local
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/vpn_db}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      max-lifetime: 540000
+      idle-timeout: 300000
+      connection-timeout: 20000
+      validation-timeout: 5000
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog-master.xml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  prometheus:
+    metrics:
+      export:
+          enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+bot:
+  token: ${BOT_TOKEN}
+  username: ${BOT_USERNAME}
+  channel:
+    username: ${BOT_CHANNEL_USERNAME}
+  support: ${BOT_SUPPORT}
+
+project:
+  vpn-host-url: https://kclash.nesvpn.sbs:8443/?id=
+
+ton:
+  usdt-master-address: ${USDT_MASTER_ADDRESS}
+  wallet-address: ${WALLET_ADDRESS}
+  api-key: ${TON_API_KEY}
+
+platega:
+  base-url: ${PLATEGA_URL}
+  merchant-id: ${PLATEGA_MERCHANT_ID}
+  secret: ${PLATEGA_SECRET}
+  pay-url: ${PLATEGA_PAY_URL}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/vpn_db}

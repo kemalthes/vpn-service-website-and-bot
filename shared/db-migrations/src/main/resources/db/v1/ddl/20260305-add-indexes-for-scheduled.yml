@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: add-index-to-payments-status
+      author: kemalthes
+      changes:
+        - createIndex:
+            tableName: payments
+            indexName: idx_payment_status
+            columns:
+              - column:
+                  name: status

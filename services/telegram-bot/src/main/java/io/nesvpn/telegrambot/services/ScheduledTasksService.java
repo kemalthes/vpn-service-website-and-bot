@@ -1,9 +1,6 @@
 package io.nesvpn.telegrambot.services;
 
-import io.nesvpn.telegrambot.dto.CryptoPayment;
-import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.handler.MessageHandler;
-import io.nesvpn.telegrambot.handler.VpnBot;
 import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.model.User;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,18 +36,34 @@ public class ScheduledTasksService {
     @Scheduled(fixedRate = 60000)
     public void checkPendingPayments() {
         List<Payment> pendingPayments = paymentService.getPendingPayments();
-
+        if (pendingPayments.isEmpty()) {
+            return;
+        }
+        List<Payment> confirmedPayments = new ArrayList<>();
         for (Payment payment : pendingPayments) {
             try {
                 boolean confirmed = paymentService.checkAndConfirmPayment(payment);
                 if (confirmed) {
-                    User user = userService.getUserById(payment.getUserId());
-                    if (user != null) {
-                        messageHandler.showSuccessPayment(user.getTgId(), payment, user);
-                    }
+                    confirmedPayments.add(payment);
                 }
             } catch (Exception e) {
                 log.error("Error checking payment {}", payment.getId(), e);
+            }
+        }
+        if (confirmedPayments.isEmpty()) {
+            return;
+        }
+        List<UUID> userIds = confirmedPayments.stream()
+                .map(Payment::getUserId)
+                .distinct()
+                .toList();
+        List<User> users = userService.getUsersByIds(userIds);
+        Map<UUID, User> userMap = users.stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        for (Payment payment : confirmedPayments) {
+            User user = userMap.get(payment.getUserId());
+            if (user != null) {
+                messageHandler.showSuccessPayment(user.getTgId(), payment, user);
             }
         }
     }

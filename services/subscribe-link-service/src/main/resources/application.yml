@@ -1,15 +1,30 @@
 spring:
   application:
     name: subscribe-link-service
+  profiles:
+    active: local
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgres:5432/vpn_db}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/vpn_db}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
   liquibase:
-    enabled: false
+    enabled: true
     change-log: classpath:db/changelog-master.xml
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 project:
   limit-devices: 3
@@ -21,3 +36,11 @@ remnawave:
   url: ${VPN_PANEL_DOMAIN}
   key: ${VPN_PANEL_BEARER}
   squad-uuid: ${VPN_PANEL_SQUAD_UUID}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/vpn_db}

@@ -7,51 +7,24 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-user}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-password}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - nesvpn-network
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  telegram-bot:
-    container_name: nesvpn_telegram_bot
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-    env_file:
-      - .env
-    build:
-      context: ./services/telegram-bot
-    depends_on:
-      localRabbitmq:
-        condition: service_healthy
-    networks:
-      - nesvpn-network
-
-  link-service:
-    container_name: nesvpn_link_service
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-    env_file:
-      - .env
-    build:
-      context: ./services/subscribe-link-service
-    depends_on:
-      localRabbitmq:
-        condition: service_healthy
-    networks:
-      - nesvpn-network
-
   loki:
     image: grafana/loki:2.9.0
     container_name: loki
+    ports:
+      - "3100:3100"
     volumes:
       - loki_data:/tmp/loki
-    networks:
-      - nesvpn-network
 
   prometheus:
     image: prom/prometheus:latest
@@ -59,12 +32,10 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.local.yml:/etc/prometheus/datasources.yml:ro
       - prom_data:/prometheus
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    networks:
-      - nesvpn-network
 
   grafana:
     image: grafana/grafana:latest
@@ -75,38 +46,29 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASS}
     ports:
-      - "13000:3000"
+      - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/dashboards:/etc/grafana/dashboards
-      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
     depends_on:
       - prometheus
       - loki
-    networks:
-      - nesvpn-network
 
   node_exporter:
     image: prom/node-exporter:latest
     container_name: node_exporter
-    networks:
-      - nesvpn-network
+    ports:
+      - "9100:9100"
 
   postgres_exporter:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: postgres_exporter
     environment:
       DATA_SOURCE_NAME: "postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:5432/${DB_NAME}?sslmode=disable"
-    networks:
-      - nesvpn-network
+    ports:
+      - "9187:9187"
 
 volumes:
   rabbitmq_data:
   loki_data:
   prom_data:
   grafana_data:
-
-networks:
-  nesvpn-network:
-    driver: bridge

@@ -14,6 +14,8 @@ val mapstructVersion = "1.6.3"
 val caffeineVersion = "3.2.2"
 val springdocVersion = "3.0.0"
 val telegramBotsVersion = "6.7.0"
+val micrometerVersion = "1.16.3"
+val lokiVersion = "1.5.2"
 
 allprojects {
     repositories {
@@ -39,6 +41,9 @@ subprojects {
 
     dependencies {
         implementation("org.springframework.boot:spring-boot-starter")
+        implementation("org.springframework.boot:spring-boot-starter-actuator")
+        implementation("io.micrometer:micrometer-registry-prometheus:$micrometerVersion")
+        implementation("com.github.loki4j:loki-logback-appender:$lokiVersion")
         compileOnly("org.projectlombok:lombok")
         annotationProcessor("org.projectlombok:lombok")
         testImplementation("org.springframework.boot:spring-boot-starter-test")
