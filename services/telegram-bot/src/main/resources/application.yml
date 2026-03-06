@@ -42,7 +42,7 @@ bot:
   support: ${BOT_SUPPORT}
 
 project:
-  vpn-host-url: https://kclash.nesvpn.sbs:8443/?id=
+  vpn-host-url: ${VPN_HOST_URL}
 
 ton:
   usdt-master-address: ${USDT_MASTER_ADDRESS}
