@@ -8,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -18,8 +19,17 @@ public class Formatter {
             Instant instant = Instant.ofEpochMilli(expiresAt);
             ZonedDateTime zonedDateTime = instant.atZone(ZoneId.of("Europe/Moscow"));
 
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
             return zonedDateTime.format(formatter);
         }
 
+    public static String formatMoscow(LocalDateTime dateTime) {
+        ZoneId moscow = ZoneId.of("Europe/Moscow");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+
+        return dateTime
+                .atZone(ZoneId.systemDefault())
+                .withZoneSameInstant(moscow)
+                .format(formatter);
+    }
 }

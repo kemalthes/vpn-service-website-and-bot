@@ -39,6 +39,9 @@ public class CallbackQueryHandler {
         User user = userService.findOrCreateByTgId(tgId);
 
         switch (data) {
+            case "start" -> {
+                messageHandler.showStart(chatId, messageId, user);
+            }
             case "back" -> {
                 handleBack(chatId, messageId, user);
             }

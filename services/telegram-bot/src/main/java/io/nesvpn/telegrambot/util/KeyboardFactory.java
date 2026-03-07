@@ -72,10 +72,11 @@ public class KeyboardFactory {
         rows.add(row3);
 
         List<InlineKeyboardButton> row4 = new ArrayList<>();
-        InlineKeyboardButton instructionBtn = new InlineKeyboardButton();
-        instructionBtn.setText("📖 Инструкция");
-        instructionBtn.setCallbackData("instructions");
-        row4.add(instructionBtn);
+        InlineKeyboardButton channelBtn = new InlineKeyboardButton();
+        channelBtn.setText("\uD83D\uDCE2 Наш канал");
+        channelBtn.setUrl("https://t.me/nesvpn");
+
+        row4.add(channelBtn);
         rows.add(row4);
 
         markup.setKeyboard(rows);
@@ -256,6 +257,28 @@ public class KeyboardFactory {
         return markup;
     }
 
+    public InlineKeyboardMarkup getExpiringSubscriptionMenu() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton subscriptionsBtn = new InlineKeyboardButton();
+        subscriptionsBtn.setText("📱 Подписка");
+        subscriptionsBtn.setCallbackData("subscription");
+        row1.add(subscriptionsBtn);
+        rows.add(row1);
+
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton startBtn = new InlineKeyboardButton();
+        startBtn.setText("◀️ Главное меню");
+        startBtn.setCallbackData("start");
+        row2.add(startBtn);
+        rows.add(row2);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
     public InlineKeyboardMarkup getInstructionsMenu() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -335,11 +358,18 @@ public class KeyboardFactory {
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton instructionBtn = new InlineKeyboardButton();
+        instructionBtn.setText("📖 Инструкция");
+        instructionBtn.setCallbackData("instructions");
+        row2.add(instructionBtn);
+        rows.add(row2);
+
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
         InlineKeyboardButton backBtn = new InlineKeyboardButton();
         backBtn.setText("◀️ Назад");
         backBtn.setCallbackData("back");
-        row2.add(backBtn);
-        rows.add(row2);
+        row3.add(backBtn);
+        rows.add(row3);
 
         markup.setKeyboard(rows);
         return markup;
