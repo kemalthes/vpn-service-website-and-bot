@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,6 +43,10 @@ public class TokenService {
         long hours = ChronoUnit.HOURS.between(now, token.getValidTo());
 
         return Math.max(1, Math.round(hours / 24.0));
+    }
+
+    public List<Token> getExpiringTokens(LocalDateTime now, LocalDateTime twoDaysLater) {
+        return tokenRepository.findExpiringTokens(now, twoDaysLater);
     }
 
     public Optional<Token> findById(Long id) {

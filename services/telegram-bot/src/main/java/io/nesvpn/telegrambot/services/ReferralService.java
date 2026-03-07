@@ -43,12 +43,6 @@ public class ReferralService {
 
     @Transactional(readOnly = true)
     public BigDecimal getReferralEarnings(UUID referrerId,UUID referralId) {
-        User referral = userRepository.findById(referralId).orElse(null);
-
-        if (referral == null) {
-            return BigDecimal.ZERO;
-        }
-
         return balanceService.getReferralEarnings(referrerId, referralId);
     }
 }
