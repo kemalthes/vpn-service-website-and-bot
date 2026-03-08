@@ -149,7 +149,7 @@ public class MessageHandler {
 
                 String displayName = DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId());
 
-                sendMessage(referrer.getTgId(), textFactory.newReferralText(displayName), null, "Markdown");
+                sendMessage(referrer.getTgId(), textFactory.newReferralText(displayName, user.getTgId()), null, "Markdown");
             }
         }
 

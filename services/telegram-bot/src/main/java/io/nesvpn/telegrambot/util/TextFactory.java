@@ -596,12 +596,15 @@ public class TextFactory {
         """;
     }
 
-    public String newReferralText(String displayName) {
+    public String newReferralText(String displayName, Long id) {
         return  String.format(
-                "🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!\n" +
-                        "💰 С его покупок вы будете получать по %s%% на баланс\n\n" +
-                        "👤 Пользователь: %s (ID: %d)",
+                """
+                        🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!
+                        💰 С его покупок вы будете получать по %s%% на баланс
+                        
+                        👤 Пользователь: %s (ID: %d)""",
                 referralPercent,
-                displayName != null ? displayName : "Новый пользователь");
+                displayName != null ? displayName : "Новый пользователь",
+                id);
     }
 }
