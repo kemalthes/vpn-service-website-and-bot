@@ -43,6 +43,7 @@ bot:
 
 project:
   vpn-host-url: ${VPN_HOST_URL}
+  referral-percent: 20
 
 ton:
   usdt-master-address: ${USDT_MASTER_ADDRESS}

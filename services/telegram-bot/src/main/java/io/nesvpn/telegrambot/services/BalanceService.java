@@ -6,9 +6,11 @@ import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.repository.BalanceTransactionRepository;
 import io.nesvpn.telegrambot.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,6 +20,9 @@ public class BalanceService {
 
     private final UserRepository userRepository;
     private final BalanceTransactionRepository transactionRepository;
+
+    @Value("${project.referral-percent}")
+    private String referralPercent;
 
     @Transactional
     public void addBalance(UUID userId, BigDecimal amount, TransactionType type, String description) {
@@ -45,7 +50,9 @@ public class BalanceService {
                     .orElse(null);
 
             if (referrer != null) {
-                BigDecimal bonus = purchaseAmount.multiply(new BigDecimal("0.10"));
+                BigDecimal bonus = purchaseAmount
+                        .multiply(new BigDecimal(referralPercent))
+                        .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
 
                 referrer.setBalance(referrer.getBalance().add(bonus));
                 userRepository.save(referrer);
@@ -55,7 +62,8 @@ public class BalanceService {
                 referralTx.setAmount(bonus);
                 referralTx.setType(TransactionType.REFERRAL_BONUS);
                 referralTx.setDescription(
-                        String.format("10%% с покупки друга id: %s (%.2f₽)",
+                        String.format("%s%% с покупки друга id: %s (%.2f₽)",
+                                referralPercent,
                                 buyer.getTgId(), purchaseAmount)
                 );
                 referralTx.setReferralId(buyer.getId());

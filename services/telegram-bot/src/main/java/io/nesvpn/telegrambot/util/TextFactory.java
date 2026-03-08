@@ -22,6 +22,9 @@ public class TextFactory {
     @Value("${platega.merchant-id}")
     private String merchantId;
 
+    @Value("${project.referral-percent}")
+    private String referralPercent;
+
     private final TonPaymentService tonPaymentService;
 
     public TextFactory(TonPaymentService tonPaymentService) {
@@ -452,7 +455,7 @@ public class TextFactory {
             <b>👥 Реферальная программа NesVPN</b>
 
             <b>💎 Как это работает:</b>
-            • Каждый друг по вашей ссылке = <b>10%% от суммы</b> каждой покупки
+            • Каждый друг по вашей ссылке = <b>%s%% от суммы</b> каждой покупки
             • Деньги с покупок рефералов <b>начисляются вам на баланс</b> автоматически
             • <b>Друг получит 50 рублей</b> на баланс
             • <b>Нет ограничений</b> по количеству приглашенных
@@ -466,6 +469,7 @@ public class TextFactory {
             <b>📋 Ваши рефералы:</b>
             <blockquote expandable>%s</blockquote>
             """,
+                referralPercent,
                 referralLink,
                 referralSize,
                 totalEarnings,
@@ -595,8 +599,9 @@ public class TextFactory {
     public String newReferralText(String displayName) {
         return  String.format(
                 "🎉 По вашей реферальной ссылке зарегистрировался новый пользователь!\n" +
-                        "💰 С его покупок вы будете получать по 10%% на баланс\n\n" +
+                        "💰 С его покупок вы будете получать по %s%% на баланс\n\n" +
                         "👤 Пользователь: %s (ID: %d)",
+                referralPercent,
                 displayName != null ? displayName : "Новый пользователь");
     }
 }
