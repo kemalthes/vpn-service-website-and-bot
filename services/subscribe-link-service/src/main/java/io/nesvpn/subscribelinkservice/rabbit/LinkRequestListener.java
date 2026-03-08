@@ -22,7 +22,7 @@ import java.util.Map;
 public class LinkRequestListener {
 
     private final LinkService linkService;
-    private final RabbitTemplate rabbitTemplate; // Нужен для отправки на кладбище
+    private final RabbitTemplate rabbitTemplate;
 
     private static final int MAX_RETRIES = 5;
 
@@ -39,7 +39,7 @@ public class LinkRequestListener {
         }
         log.info("[Link listener] Генерация ссылки: {} (Попытка {})", requestId, retryCount + 1);
         try {
-            linkService.process(request.getUserId(), request.getPlanId(), request.getOrderId())
+            linkService.process(request.getUserId(), request.getPlanId(), request.getOrderId(), request.getTgUsername())
                     .subscribeOn(Schedulers.boundedElastic())
                     .block(Duration.ofMinutes(1));
             log.info("[Link listener] Заказ {} успешно закрыт!", requestId);

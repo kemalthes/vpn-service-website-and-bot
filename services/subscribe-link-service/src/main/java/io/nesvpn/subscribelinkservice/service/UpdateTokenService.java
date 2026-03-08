@@ -29,6 +29,7 @@ import java.util.UUID;
 public class UpdateTokenService {
 
     private final OrderRepository orderRepository;
+    private final UtilService utilService;
 
     @Value("${project.limit-devices}")
     private Integer limitDevices;
@@ -39,7 +40,7 @@ public class UpdateTokenService {
     private final VpnPlanRepository vpnPlanRepository;
 
     @Transactional
-    public Mono<String> process(UUID userId, Long planId, Long orderId) {
+    public Mono<String> process(UUID userId, Long planId, Long orderId, String tgUsername) {
         log.info("[UpdateTokenService] Старт продления подписки. userId: {}, orderId: {}, planId: {}", userId, orderId, planId);
         return Mono.fromCallable(() -> {
                     log.debug("[UpdateTokenService] Ищем заказ {} в БД...", orderId);
@@ -73,7 +74,10 @@ public class UpdateTokenService {
 
                     log.info("[UpdateTokenService] Отправляем PATCH запрос в Remnawave для UUID: {}", token.getVpnPanelUserUuid());
                     remnawaveClient.updateVpnUser(
-                                    token.getVpnPanelUserUuid().toString(), 0L, expiresAt, limitDevices)
+                                    token.getVpnPanelUserUuid().toString(),
+                                    0L, expiresAt,
+                                    limitDevices,
+                                    utilService.createDescription(user, tgUsername))
                             .block(Duration.ofSeconds(10));
                     log.info("[UpdateTokenService] Успешный ответ от Remnawave при обновлении дат!");
                     log.debug("[UpdateTokenService] Сохраняем новую дату токена и закрываем заказ в БД...");

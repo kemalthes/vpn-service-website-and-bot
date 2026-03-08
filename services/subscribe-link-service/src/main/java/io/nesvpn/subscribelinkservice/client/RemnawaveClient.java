@@ -31,9 +31,16 @@ public class RemnawaveClient implements VpnClient {
     private String apiKey;
 
     @Override
-    public Mono<String> createNewVpnUser(String username, Long tgId, String email, LocalDateTime expiredAt, Integer deviceLimit, Long trafficLimit, String squadUuid) {
+    public Mono<String> createNewVpnUser(String username, Long tgId, String email, LocalDateTime expiredAt, Integer deviceLimit, Long trafficLimit, String squadUuid, String description) {
         NewUserRequest newUserRequest = new NewUserRequest(
-                username, tgId, email, new String[]{squadUuid}, trafficLimit, String.valueOf(expiredAt), deviceLimit
+                username,
+                tgId,
+                email,
+                new String[]{squadUuid},
+                trafficLimit,
+                String.valueOf(expiredAt),
+                deviceLimit,
+                description
         );
         log.info("[Create] Отправляем POST запрос в /api/users для username: {}", username);
         return webClient.post()
@@ -42,7 +49,7 @@ public class RemnawaveClient implements VpnClient {
                 .bodyValue(newUserRequest)
                 .retrieve()
                 .bodyToMono(Map.class)
-                .doOnNext(json -> log.info("📥 [Create] Успешный ответ: {}", json))
+                .doOnNext(json -> log.info("[Create] Успешный ответ: {}", json))
                 .flatMap(resp -> {
                     try {
                         @SuppressWarnings("unchecked")
@@ -70,12 +77,13 @@ public class RemnawaveClient implements VpnClient {
     }
 
     @Override
-    public Mono<Void> updateVpnUser(String userUuid, Long dataLimitBytes, LocalDateTime expiresAt, Integer maxDevices) {
+    public Mono<Void> updateVpnUser(String userUuid, Long dataLimitBytes, LocalDateTime expiresAt, Integer maxDevices, String description) {
         UpdateUserRequest updateBody = new UpdateUserRequest(
                 userUuid,
                 dataLimitBytes,
                 expiresAt.format(DateTimeFormatter.ISO_DATE_TIME),
-                maxDevices
+                maxDevices,
+                description
         );
         log.info("[Update] Отправляем PATCH запрос для юзера: {}", userUuid);
         return webClient.patch()

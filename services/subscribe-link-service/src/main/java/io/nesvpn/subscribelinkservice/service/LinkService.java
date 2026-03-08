@@ -51,13 +51,13 @@ public class LinkService {
     }
 
     @Transactional(readOnly = true)
-    public Mono<String> process(UUID userId, Long planId, Long orderId) {
+    public Mono<String> process(UUID userId, Long planId, Long orderId, String tgUsername) {
         return Mono.fromCallable(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(UserNotFoundException::new);
                     if (tokenRepository.findByUser(user).isEmpty()) {
                         newTokenCounter.increment();
-                        return newTokenService.process(userId, orderId).block();
+                        return newTokenService.process(userId, orderId, tgUsername).block();
                     } else {
                         switch (planId.intValue()) {
                             case 1:
@@ -70,7 +70,7 @@ public class LinkService {
                                 updateTokenCounterSix.increment();
                                 break;
                         }
-                        return updateTokenService.process(userId, planId, orderId).block();
+                        return updateTokenService.process(userId, planId, orderId, tgUsername).block();
                     }
                 })
                 .subscribeOn(Schedulers.boundedElastic());

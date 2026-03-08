@@ -722,7 +722,7 @@ public class MessageHandler {
 
 
 
-        Order order = orderService.createOrder(user.getId(), plan);
+        Order order = orderService.createOrder(user, plan);
         log.info("Заказ {} cоздан", order.getId());
 
         editOrSendMessage(chatId, messageId, textFactory.successSubscribeProvidedText(), null, "HTML");

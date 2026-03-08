@@ -24,5 +24,6 @@ public class NewUserRequest {
 
     private Integer hwidDeviceLimit;
 
+    private String description;
 
 }

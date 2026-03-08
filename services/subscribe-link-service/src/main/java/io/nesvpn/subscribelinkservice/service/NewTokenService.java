@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
-@Slf4j // Добавили поддержку логов
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NewTokenService {
@@ -30,6 +30,7 @@ public class NewTokenService {
     private final RemnawaveClient remnawaveClient;
     private final TokenRepository tokenRepository;
     private final UserRepository userRepository;
+    private final UtilService utilService;
 
     @Value("${project.limit-devices-free}")
     private Integer limitDevices;
@@ -44,7 +45,7 @@ public class NewTokenService {
     private Integer daysLimit;
 
     @Transactional
-    public Mono<String> process(UUID userId, Long orderId) {
+    public Mono<String> process(UUID userId, Long orderId, String tgUsername) {
         log.info("[NewTokenService] Начинаем создание токена для пользователя: {}", userId);
         return Mono.fromCallable(() -> {
                     log.debug("[NewTokenService] Поиск пользователя {} в базе данных...", userId);
@@ -56,7 +57,14 @@ public class NewTokenService {
                     LocalDateTime now = LocalDateTime.now();
                     log.info("[NewTokenService] Отправляем запрос в Remnawave (createNewVpnUser). Username: {}, tgId: {}", username, user.getTgId());
                     String vpnUserUuid = remnawaveClient.createNewVpnUser(
-                                    username, user.getTgId(), user.getEmail(), now.plusDays(daysLimit), limitDevices, trafficLimit, defaultSquadUuid)
+                                    username,
+                                    user.getTgId(),
+                                    user.getEmail(),
+                                    now.plusDays(daysLimit),
+                                    limitDevices,
+                                    trafficLimit,
+                                    defaultSquadUuid,
+                                    utilService.createDescription(user, tgUsername))
                             .block(Duration.ofSeconds(10));
                     log.info("[NewTokenService] Успешный ответ от Remnawave! Получен VPN User UUID: {}", vpnUserUuid);
                     log.info("[NewTokenService] Запрашиваем ссылку (getUserLink) для UUID: {}", vpnUserUuid);

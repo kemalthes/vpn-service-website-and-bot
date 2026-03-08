@@ -35,7 +35,7 @@ management:
       application: ${spring.application.name}
 
 bot:
-  token: ${BOT_TOKEN}
+  token: ${BOT_TOKEN_TEST}
   username: ${BOT_USERNAME}
   channel:
     username: ${BOT_CHANNEL_USERNAME}

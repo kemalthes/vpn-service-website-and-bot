@@ -38,7 +38,7 @@ public class UserService {
         user.setBalance(BigDecimal.ZERO);
         user.setCreatedAt(LocalDateTime.now());
         userRepository.save(user);
-        Order order = orderService.createOrder(user.getId(), vpnPlanService.findById(4L).orElseThrow());
+        Order order = orderService.createOrder(user, vpnPlanService.findById(4L).orElseThrow());
         log.info("User created: {}, order id: {}", user, order.getId());
         return user;
     }

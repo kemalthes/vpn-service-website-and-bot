@@ -13,4 +13,6 @@ public class LinkRequest {
 
     private Long planId;
 
+    private String tgUsername;
+
 }

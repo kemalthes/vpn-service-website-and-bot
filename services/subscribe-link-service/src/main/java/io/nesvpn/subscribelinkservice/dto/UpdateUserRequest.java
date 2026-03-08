@@ -14,4 +14,6 @@ public class UpdateUserRequest {
     private String expireAt;
 
     private Integer hwidDeviceLimit;
+
+    private String description;
 }

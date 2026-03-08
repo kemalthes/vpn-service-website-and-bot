@@ -1,10 +1,14 @@
 package io.nesvpn.telegrambot.services;
 
 import io.nesvpn.telegrambot.enums.TransactionType;
+import io.nesvpn.telegrambot.handler.VpnBot;
 import io.nesvpn.telegrambot.model.Order;
 import io.nesvpn.telegrambot.enums.OrderStatus;
+import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.model.VpnPlan;
+import io.nesvpn.telegrambot.rabbit.OrderPaidEvent;
 import io.nesvpn.telegrambot.repository.OrderRepository;
+import io.nesvpn.telegrambot.util.DisplayTelegramUsername;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -21,19 +25,27 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderService {
 
+    private final VpnBot vpnBot;
     private final OrderRepository orderRepository;
     private final BalanceService balanceService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public Order createOrder(UUID userId, VpnPlan plan) {
+    public Order createOrder(User user, VpnPlan plan) {
         Order newOrder = new Order();
-        newOrder.setUserId(userId);
+        newOrder.setUserId(user.getId());
         newOrder.setVpnPlanId(plan.getId());
         newOrder.setStatus(OrderStatus.PAID.getValue());
         Order savedOrder = orderRepository.save(newOrder);
-        balanceService.subtractBalance(userId, BigDecimal.valueOf(plan.getPrice()), TransactionType.SUBSCRIPTION_PURCHASE, "Продление VPN-подписки на " + plan.getDuration() + " дней");
-        eventPublisher.publishEvent(new OrderPaidEvent(userId, savedOrder.getId(), plan.getId()));
+        balanceService.subtractBalance(
+                user.getId(),
+                BigDecimal.valueOf(plan.getPrice()),
+                TransactionType.SUBSCRIPTION_PURCHASE,
+                "Продление VPN-подписки на " + plan.getDuration() + " дней");
+        eventPublisher.publishEvent(new OrderPaidEvent(user.getId(),
+                savedOrder.getId(),
+                plan.getId(),
+                DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId())));
         return savedOrder;
     }
 
@@ -57,6 +69,4 @@ public class OrderService {
     public List<Order> getOrdersByStatus(OrderStatus status) {
         return orderRepository.findAllByStatus(status.getValue());
     }
-
-    public record OrderPaidEvent(UUID userId, Long orderId, Long planId) {}
 }

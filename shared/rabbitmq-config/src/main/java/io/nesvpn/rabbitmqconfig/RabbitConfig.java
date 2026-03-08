@@ -24,7 +24,7 @@ public class RabbitConfig {
 
     public static final String ROUTING_KEY_REQUEST = "link.request";
     public static final String ROUTING_KEY_DLX = "dlx.link.request";
-    public static final String ROUTING_KEY_FAILED = "link.request.failed"; // Новый ключ для кладбища
+    public static final String ROUTING_KEY_FAILED = "link.request.failed";
 
     @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
@@ -37,29 +37,19 @@ public class RabbitConfig {
     }
 
     @Bean
-    public RabbitTemplate linkRabbitTemplate(ConnectionFactory connectionFactory,
-                                         Jackson2JsonMessageConverter converter) {
+    public RabbitTemplate linkRabbitTemplate(ConnectionFactory connectionFactory, Jackson2JsonMessageConverter converter) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(converter);
-
-        // Обязательно для работы ReturnsCallback
         template.setMandatory(true);
-
-        // 1. ОБРАБОТКА ПОДТВЕРЖДЕНИЙ ОТ БРОКЕРА (ConfirmCallback)
         template.setConfirmCallback((correlationData, ack, cause) -> {
             if (!ack) {
-                // Брокер прислал NACK (например, переполнен диск на сервере RabbitMQ)
-                // Здесь в идеале нужно кидать алерт в Grafana или Telegram разработчикам
-                log.error("🚨 Брокер ОТКЛОНИЛ сообщение (NACK)! Причина: {}", cause);
+                log.error("Брокер ОТКЛОНИЛ сообщение (NACK)! Причина: {}", cause);
             }
         });
-
-        // 2. ОБРАБОТКА НЕМАРШРУТИЗИРУЕМЫХ СООБЩЕНИЙ (ReturnsCallback)
         template.setReturnsCallback(returned -> {
-            log.error("⚠️ Сообщение потеряно! Exchange: {}, RoutingKey: {}, Причина: {}",
+            log.error("Сообщение потеряно. Exchange: {}, RoutingKey: {}, Причина: {}",
                     returned.getExchange(), returned.getRoutingKey(), returned.getReplyText());
         });
-
         return template;
     }
 
@@ -73,9 +63,6 @@ public class RabbitConfig {
         return new DirectExchange(DLX_EXCHANGE);
     }
 
-    // --- ОЧЕРЕДИ ---
-
-    // 1. Основная очередь
     @Bean
     public Queue linkRequestQueue() {
         return QueueBuilder.durable(ROUTING_KEY_REQUEST)
@@ -84,7 +71,6 @@ public class RabbitConfig {
                 .build();
     }
 
-    // 2. Очередь задержки (Крутится 30 сек и возвращается в основную)
     @Bean
     public Queue dlqRequestQueue() {
         return QueueBuilder.durable("dlq.link.request")
@@ -94,13 +80,10 @@ public class RabbitConfig {
                 .build();
     }
 
-    // 3. ОЧЕРЕДЬ-КЛАДБИЩЕ (Для сообщений, исчерпавших лимит попыток)
     @Bean
     public Queue failedRequestQueue() {
         return QueueBuilder.durable("failed.link.request").build();
     }
-
-    // --- БИНДИНГИ ---
 
     @Bean
     public Binding linkRequestBinding() {
@@ -114,7 +97,6 @@ public class RabbitConfig {
 
     @Bean
     public Binding failedRequestBinding() {
-        // Биндим кладбище к DLX обменнику
         return BindingBuilder.bind(failedRequestQueue()).to(dlxExchange()).with(ROUTING_KEY_FAILED);
     }
 }
