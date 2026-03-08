@@ -1,14 +1,12 @@
 package io.nesvpn.telegrambot.services;
 
 import io.nesvpn.telegrambot.enums.TransactionType;
-import io.nesvpn.telegrambot.handler.VpnBot;
 import io.nesvpn.telegrambot.model.Order;
 import io.nesvpn.telegrambot.enums.OrderStatus;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.model.VpnPlan;
 import io.nesvpn.telegrambot.rabbit.OrderPaidEvent;
 import io.nesvpn.telegrambot.repository.OrderRepository;
-import io.nesvpn.telegrambot.util.DisplayTelegramUsername;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +23,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderService {
 
-    private final VpnBot vpnBot;
     private final OrderRepository orderRepository;
     private final BalanceService balanceService;
     private final ApplicationEventPublisher eventPublisher;
@@ -45,7 +42,7 @@ public class OrderService {
         eventPublisher.publishEvent(new OrderPaidEvent(user.getId(),
                 savedOrder.getId(),
                 plan.getId(),
-                DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId())));
+                user.getTgId()));
         return savedOrder;
     }
 
