@@ -33,6 +33,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
@@ -93,11 +94,6 @@ public class MessageHandler {
 
     public void handle(Message message) {
         String text = message.getText();
-
-        if (!telegramUserService.existsByTgId(message.getFrom().getId())) {
-            showSubscribeChannel(message.getChatId(), null);
-        }
-
         if (text.startsWith("/start")) {
             handleStart(message);
         } else if (text.equals("/profile")) {
@@ -152,7 +148,9 @@ public class MessageHandler {
                 sendMessage(referrer.getTgId(), textFactory.newReferralText(displayName, user.getTgId()), null, "Markdown");
             }
         }
-
+        if (isNewUser) {
+            showSubscribeChannel(chatId, null);
+        }
         showStart(chatId, null, user);
     }
 
@@ -540,43 +538,43 @@ public class MessageHandler {
 
     public void showReferrals(Long chatId, Integer messageId, User user) {
         Long userId = user.getTgId();
-
         telegramUserService.updateState(userId, BotState.REFERRALS, BotState.START);
-
         String referralLink = "https://t.me/" + vpnBot.getBotUsername() + "?start=" + user.getReferralCode();
-
         List<User> referrals = userService.getReferralsByReferrer(userId);
-
-        StringBuilder referralsList = new StringBuilder();
+        record ReferralStat(User user, BigDecimal earnings) {}
         BigDecimal totalEarnings = BigDecimal.ZERO;
-        int referralsToShow = 15;
-        int count = 0;
-
+        List<ReferralStat> stats = new ArrayList<>();
         for (User referral : referrals) {
             BigDecimal earnings = referralService.getReferralEarnings(user.getId(), referral.getId());
-            totalEarnings = totalEarnings.add(earnings != null ? earnings : BigDecimal.ZERO);
+            BigDecimal safeEarnings = (earnings != null) ? earnings : BigDecimal.ZERO;
 
-            if (count < referralsToShow) {
-                String referralUsername = DisplayTelegramUsername.getDisplayName(vpnBot,referral.getTgId());
-
-                String refInfo = String.format(
-                    "%d) %s (id: %d) принес %.2f₽",
-                        count + 1,
-                        referralUsername != null ? referralUsername : "no_username",
-                        referral.getTgId(),
-                        earnings != null ? earnings : BigDecimal.ZERO
-                );
-                referralsList.append(refInfo).append("\n");
-                count++;
-            }
-
+            totalEarnings = totalEarnings.add(safeEarnings);
+            stats.add(new ReferralStat(referral, safeEarnings));
         }
-
+        stats.sort((a, b) -> b.earnings().compareTo(a.earnings()));
+        StringBuilder referralsList = new StringBuilder();
+        int referralsToShow = 15;
+        int count = 0;
+        for (ReferralStat stat : stats) {
+            if (count >= referralsToShow) break;
+            User referral = stat.user();
+            String referralUsername = DisplayTelegramUsername.getDisplayName(vpnBot, referral.getTgId());
+            String refInfo = String.format(
+                    "%d) %s (id: %d) принес %.2f₽",
+                    count + 1,
+                    referralUsername != null ? referralUsername : "no_username",
+                    referral.getTgId(),
+                    stat.earnings()
+            );
+            referralsList.append(refInfo).append("\n");
+            count++;
+        }
         if (referrals.size() > referralsToShow) {
             referralsList.append(String.format("... и еще %d", referrals.size() - referralsToShow));
         }
-
-        editOrSendMessage(chatId, messageId, textFactory.referralsText(referralLink, referrals.size(), totalEarnings, referralsList.toString()), keyboardFactory.getBackButton(), "HTML");
+        editOrSendMessage(chatId, messageId,
+                textFactory.referralsText(referralLink, referrals.size(), totalEarnings, referralsList.toString()),
+                keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showInstructions(Long chatId, Integer messageId, User user) {
