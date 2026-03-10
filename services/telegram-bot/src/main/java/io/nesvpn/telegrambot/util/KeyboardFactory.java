@@ -1,6 +1,7 @@
 package io.nesvpn.telegrambot.util;
 
 import io.nesvpn.telegrambot.dto.CryptoPayment;
+import io.nesvpn.telegrambot.dto.HwidDevice;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.model.VpnPlan;
@@ -257,6 +258,63 @@ public class KeyboardFactory {
         return markup;
     }
 
+    public InlineKeyboardMarkup getHwidDevicesKeyboard(List<HwidDevice> hwidDevices) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        hwidDevices.forEach(device -> {
+            List<InlineKeyboardButton> row = new ArrayList<>();
+
+            InlineKeyboardButton button = new InlineKeyboardButton();
+            String model = device.getDeviceModel() != null
+                    ? device.getDeviceModel()
+                    : "Устройство";
+
+            String date = device.getCreatedAt() != null
+                    ? Formatter.formatMoscow(device.getCreatedAt().toLocalDateTime(), "dd.MM")
+                    : "";
+
+            String text = "📱 " + model + " • " + date;
+
+            button.setText(text);
+            button.setCallbackData("delete_hwid_confirm_" + device.getHwid());
+
+            row.add(button);
+            rows.add(row);
+        });
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton();
+        backBtn.setText("◀️ Назад");
+        backBtn.setCallbackData("back");
+        row.add(backBtn);
+        rows.add(row);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup getHwidDeviceDeleteKeyboard(String hwid) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton();
+        backBtn.setText("◀️ Назад");
+        backBtn.setCallbackData("back");
+        row.add(backBtn);
+
+        InlineKeyboardButton deleteBtn = new InlineKeyboardButton();
+        deleteBtn.setText("\uD83D\uDDD1️ Удалить");
+        deleteBtn.setCallbackData("delete_hwid_confirmation_" + hwid);
+        row.add(deleteBtn);
+
+        rows.add(row);
+        markup.setKeyboard(rows);
+
+        return markup;
+    }
+
     public InlineKeyboardMarkup getExpiringSubscriptionMenu() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -346,15 +404,21 @@ public class KeyboardFactory {
         return markup;
     }
 
-    public InlineKeyboardMarkup getSubscriptionKeyboard(Long tokenId, String tokenUrl, boolean isActive) {
+    public InlineKeyboardMarkup getSubscriptionKeyboard(boolean isActive, Integer devicesCount) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
+
         InlineKeyboardButton extendBtn = new InlineKeyboardButton();
-        extendBtn.setText(isActive ? "🔄 Продлить подписку" : "🔄 Возобновить подписку");
+        extendBtn.setText(isActive ? "🔄 Продлить" : "🔄 Возобновить");
         extendBtn.setCallbackData("subscription_extend");
         row1.add(extendBtn);
+
+        InlineKeyboardButton devicesBtn = new InlineKeyboardButton();
+        devicesBtn.setText(String.format("📱 Устройства (%d)", devicesCount));
+        devicesBtn.setCallbackData("subscription_devices");
+        row1.add(devicesBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();

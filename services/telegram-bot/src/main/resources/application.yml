@@ -43,7 +43,10 @@ bot:
 
 project:
   vpn-host-url: ${VPN_HOST_URL}
+  vpn-panel-token: ${VPN_PANEL_BEARER}
+  vpn-panel-url: ${VPN_PANEL_DOMAIN}
   referral-percent: 20
+  max-devices: 3
 
 ton:
   usdt-master-address: ${USDT_MASTER_ADDRESS}

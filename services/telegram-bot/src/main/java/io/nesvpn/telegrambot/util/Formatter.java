@@ -32,4 +32,18 @@ public class Formatter {
                 .withZoneSameInstant(moscow)
                 .format(formatter);
     }
+
+    public static String formatMoscow(LocalDateTime dateTime, String pattern) {
+        if (dateTime == null) {
+            return "";
+        }
+
+        ZoneId moscow = ZoneId.of("Europe/Moscow");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern);
+
+        return dateTime
+                .atZone(ZoneId.systemDefault())
+                .withZoneSameInstant(moscow)
+                .format(formatter);
+    }
 }

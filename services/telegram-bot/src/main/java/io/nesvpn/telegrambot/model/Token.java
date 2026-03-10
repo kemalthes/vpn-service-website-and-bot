@@ -32,6 +32,8 @@ public class Token {
     @Column(name = "user_id")
     private UUID userId;
 
+    private UUID vpnPanelUserUuid;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)  // Изменено
     private User user;

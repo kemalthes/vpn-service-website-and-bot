@@ -2,13 +2,12 @@ package io.nesvpn.telegrambot.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nesvpn.telegrambot.dto.CryptoPayment;
+import io.nesvpn.telegrambot.dto.HwidDevice;
 import io.nesvpn.telegrambot.dto.PlategaCreateResponse;
 import io.nesvpn.telegrambot.enums.BotState;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.enums.PaymentStatus;
-import io.nesvpn.telegrambot.enums.TransactionType;
 import io.nesvpn.telegrambot.model.*;
-import io.nesvpn.telegrambot.rabbit.LinkRequestProducer;
 import io.nesvpn.telegrambot.services.*;
 import io.nesvpn.telegrambot.services.ReferralService;
 import io.nesvpn.telegrambot.util.*;
@@ -32,7 +31,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -51,7 +49,6 @@ public class MessageHandler {
     private final BalanceService balanceService;
     private final TokenService tokenService;
     private final VpnPlanService vpnPlanService;
-    private final LinkRequestProducer linkRequestProducer;
     private final OrderService orderService;
     private final FloatRatesService floatRatesService;
     private final TonPaymentService tonPaymentService;
@@ -68,7 +65,7 @@ public class MessageHandler {
             BalanceService balanceService,
             TokenService tokenService,
             VpnPlanService vpnPlanService,
-            @Lazy VpnBot vpnBot, LinkRequestProducer linkRequestProducer,
+            @Lazy VpnBot vpnBot,
             OrderService orderService,
             FloatRatesService floatRatesService,
             TonPaymentService tonPaymentService,
@@ -87,7 +84,6 @@ public class MessageHandler {
         this.paymentService = paymentService;
         this.cooldownService = cooldownService;
         this.vpnBot = vpnBot;
-        this.linkRequestProducer = linkRequestProducer;
         this.plategaService = plategaService;
         this.textFactory = textFactory;
     }
@@ -481,7 +477,7 @@ public class MessageHandler {
                     .POST(HttpRequest.BodyPublishers.ofByteArray(outputStream.toByteArray()))
                     .build();
 
-            HttpResponse<String> response = client.send(request,
+            client.send(request,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
 
 
@@ -579,7 +575,7 @@ public class MessageHandler {
 
     public void showInstructions(Long chatId, Integer messageId, User user) {
         Long userId = user.getTgId();
-        telegramUserService.updateState(userId, BotState.INSTRUCTIONS, BotState.START);
+        telegramUserService.updateState(userId, BotState.INSTRUCTIONS, BotState.SUBSCRIPTIONS);
 
         editOrSendMessage(chatId, messageId, textFactory.instructionsText(), keyboardFactory.getInstructionsMenu(), "Markdown");
     }
@@ -643,14 +639,50 @@ public class MessageHandler {
             long daysLeft = tokenService.getDaysLeft(token);
             boolean isActive = token.isActive();
             String tokenUrl = tokenService.getFullTokenUrl(token);
+            List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(token);
+            Integer devicesCount = hwidDevices.size();
             String validTo = token.getValidTo() != null
                     ? Formatter.formatMoscow(token.getValidTo())
                     : "Не указано";
 
-            editOrSendMessage(chatId, messageId, textFactory.subscriptionText(isActive, tokenUrl, validTo, daysLeft), keyboardFactory.getSubscriptionKeyboard(token.getId(), tokenUrl, token.isActive()), "HTML");
+            editOrSendMessage(chatId, messageId, textFactory.subscriptionText(isActive, tokenUrl, validTo, daysLeft, devicesCount), keyboardFactory.getSubscriptionKeyboard(token.isActive(), devicesCount), "HTML");
         }
     }
 
+    public void showHwidDevices(Long chatId, Integer messageId, User user) {
+        Long tgId = user.getTgId();
+        telegramUserService.updateState(tgId, BotState.SUBSCRIPTION_HWID_DEVICES, BotState.SUBSCRIPTIONS);
+
+        Token token = tokenService.getUserToken(user.getId());
+
+        if (token == null) {
+            editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+            return;
+        }
+
+        List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(token);
+
+        editOrSendMessage(chatId, messageId, textFactory.hwidDevicesText(hwidDevices), keyboardFactory.getHwidDevicesKeyboard(hwidDevices), "HTML");
+    }
+
+    public void showDeleteHwidDeviceConfirm(Long chatId, Integer messageId, String hwid, User user) {
+        telegramUserService.updateState(user.getTgId(), BotState.SUBSCRIPTION_HWID_DEVICES_CONFIRM, BotState.SUBSCRIPTION_HWID_DEVICES);
+        editOrSendMessage(chatId, messageId, textFactory.hwidDeviceDeleteConfirm(), keyboardFactory.getHwidDeviceDeleteKeyboard(hwid), "HTML");
+    }
+
+    public void showDeleteHwidDevice(Long chatId, Integer messageId, String hwid, User user) {
+        Long tgId = user.getTgId();
+        telegramUserService.updateState(tgId, BotState.SUBSCRIPTIONS, BotState.SUBSCRIPTION_HWID_DEVICES);
+        Token token = tokenService.getUserToken(user.getId());
+
+        if (token == null) {
+            editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+            return;
+        }
+
+        boolean isSuccess = tokenService.deleteHwidDeviceByToken(token, hwid);
+        editOrSendMessage(chatId, messageId, isSuccess ? textFactory.hwidDeviceDeleteSuccess() : textFactory.hwidDeviceDeleteError(), keyboardFactory.getBackButton(), "HTML");
+    }
 
     public void showSubscriptionExtend(Long chatId, Integer messageId, User user) {
         Long tgId = user.getTgId();

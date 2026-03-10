@@ -1,6 +1,7 @@
 package io.nesvpn.telegrambot.util;
 
 import io.nesvpn.telegrambot.dto.CryptoPayment;
+import io.nesvpn.telegrambot.dto.HwidDevice;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.model.BalanceTransaction;
 import io.nesvpn.telegrambot.model.Payment;
@@ -24,6 +25,9 @@ public class TextFactory {
 
     @Value("${project.referral-percent}")
     private String referralPercent;
+
+    @Value("${project.max-devices}")
+    private Integer maxDevices;
 
     private final TonPaymentService tonPaymentService;
 
@@ -321,7 +325,7 @@ public class TextFactory {
         """, validTo);
     }
 
-    public String subscriptionText(Boolean isActive, String tokenUrl, String validTo, Long daysLeft) {
+    public String subscriptionText(Boolean isActive, String tokenUrl, String validTo, Long daysLeft, Integer devicesCount) {
         String statusEmoji = isActive ? "✅" : "❌";
         String statusText = isActive ? "Активна" : "Истекла";
 
@@ -336,7 +340,7 @@ public class TextFactory {
             📅 <b>Действует до:</b> %s
             ⏳ <b>Осталось дней:</b> %d
             
-            👥 <b>Устройств всего:</b> 3
+            👥 <b>Устройств всего:</b> %d / %d
             
             %s
             """,
@@ -345,6 +349,8 @@ public class TextFactory {
                 tokenUrl,
                 validTo,
                 daysLeft,
+                devicesCount,
+                Math.max(devicesCount, maxDevices),
                 daysLeft <= 7 && daysLeft > 0
                         ? "<i>⚠️ Срок подписки истекает скоро! Продлите её.</i>"
                         : ""
@@ -495,6 +501,71 @@ public class TextFactory {
                 createdAt,
                 referralLink
         );
+    }
+
+    public String hwidDevicesText(List<HwidDevice> hwidDevices) {
+        int count = hwidDevices != null ? hwidDevices.size() : 0;
+        int maxUserDevices = Math.max(maxDevices, count);
+
+        String infoText;
+
+        if (count == 0) {
+            infoText = """
+            <i>Вы пока ещё не подключили ни одного устройства.
+            После подключения VPN ваше устройство автоматически появится в этом списке.</i>
+            """;
+        } else if (count == maxUserDevices) {
+            infoText = """
+            ⚠️ <b>Достигнут лимит устройств.</b>
+    
+            <b>Если вы хотите использовать VPN на другом устройстве, удалите одно из текущих.</b>
+            """;
+        } else {
+            infoText = """
+            <i>Вы можете подключить ещё устройства.
+            Если потребуется освободить место, удалите одно из текущих.</i>
+            """;
+        }
+
+        return """
+            🔐 <b>Управление устройствами</b>
+
+            📱 <b>Сейчас привязано устройств:</b> %d из %d
+
+            %s
+            ‼️ <b>После удаления устройства обновите подписку в VPN-клиенте.</b>
+            Это нужно сделать на <b>всех оставшихся устройствах</b>, чтобы они получили обновлённые настройки подключения.
+            
+            👇 <i>Выберите устройство, которое будет удалено</i>
+            """.formatted(count, maxUserDevices, infoText);
+    }
+
+    public String hwidDeviceDeleteConfirm() {
+        return """
+            ⚠️ <b>Удаление устройства</b>
+            
+            Вы уверены, что хотите удалить это устройство?
+            
+            ‼️ <b>После удаления устройства обновите подписку в VPN-клиенте на всех оставшихся устройствах, удаленное устройство будет отключено до повторного добавления.</b>            
+            """;
+    }
+
+    public String hwidDeviceDeleteSuccess() {
+        return """
+            ✅ <b>Устройство успешно удалено</b>
+
+            ‼️ <b>Обновите подписку в VPN-клиенте на всех оставшихся устройствах и переподключитесь к ней</b>
+            
+            <i>Изменения могут отобразиться не сразу. Пожалуйста, подождите некоторое время.</i>
+            """;
+    }
+
+    public String hwidDeviceDeleteError() {
+        return """
+            ❌ <b>Не удалось удалить устройство</b>
+
+            <i>Произошла ошибка при удалении устройства. Пожалуйста, попробуйте снова немного позже.</i>
+            """;
     }
 
     public String startText(String displayName) {

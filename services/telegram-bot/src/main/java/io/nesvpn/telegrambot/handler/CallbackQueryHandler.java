@@ -4,12 +4,14 @@ import io.nesvpn.telegrambot.enums.BotState;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.services.TelegramUserService;
 import io.nesvpn.telegrambot.services.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+@Slf4j
 @Service
 public class CallbackQueryHandler {
 
@@ -76,7 +78,6 @@ public class CallbackQueryHandler {
                 messageHandler.showTopUp(chatId, messageId);
             }
             case "payment_method_sbp" -> {
-//                messageHandler.showAwaitingBalanceDev(chatId, messageId, user);
                 messageHandler.showAwaitingBalance(chatId, messageId, user);
             }
             case "payment_method_usdt" -> {
@@ -84,6 +85,9 @@ public class CallbackQueryHandler {
             }
             case "subscription" -> {
                 messageHandler.showSubscription(chatId, messageId, user);
+            }
+            case "subscription_devices" -> {
+                messageHandler.showHwidDevices(chatId, messageId, user);
             }
             case "subscription_extend" -> {
                 messageHandler.showSubscriptionExtend(chatId, messageId, user);
@@ -111,6 +115,13 @@ public class CallbackQueryHandler {
             String[] parts = data.replace("check_payment_crypto_", "").split("_");
             String transactionId = parts[0];
             messageHandler.checkPayment(chatId, messageId, transactionId, user);
+        } else if (data.startsWith("delete_hwid_confirm_")) {
+            String hwid = data.replace("delete_hwid_confirm_", "");
+            messageHandler.showDeleteHwidDeviceConfirm(chatId, messageId, hwid, user);
+        } else if (data.startsWith("delete_hwid_confirmation_")) {
+            String hwid = data.replace("delete_hwid_confirmation_", "");
+            log.info("showDeleteHwidDevice CALLED");
+            messageHandler.showDeleteHwidDevice(chatId, messageId, hwid, user);
         }
     }
 
@@ -141,6 +152,9 @@ public class CallbackQueryHandler {
                 break;
             case INSTRUCTIONS:
                 messageHandler.showInstructions(chatId, messageId, user);
+                break;
+            case SUBSCRIPTION_HWID_DEVICES:
+                messageHandler.showHwidDevices(chatId, messageId, user);
                 break;
             case SUBSCRIPTIONS_EXTEND:
                 messageHandler.showSubscriptionExtend(chatId, messageId, user);
