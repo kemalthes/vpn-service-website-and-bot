@@ -389,6 +389,15 @@ public class TextFactory {
             """;
     }
 
+    public String errorPlategaText() {
+        return """
+            😭 *Не удалось обработать платёж*
+
+            Сейчас возникла ошибка на стороне платёжного провайдера.
+            Попробуйте выполнить оплату ещё раз или вернитесь немного позже.
+            """;
+    }
+
     public String balanceHistoryText(List<BalanceTransaction> history) {
         StringBuilder historyText = new StringBuilder();
 
