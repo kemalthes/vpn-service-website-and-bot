@@ -1,5 +1,6 @@
 package io.nesvpn.subscribelinkservice.client;
 
+import io.nesvpn.subscribelinkservice.dto.HwidGetAllResponse;
 import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
@@ -11,4 +12,10 @@ public interface VpnClient {
     Mono<Void> updateVpnUser(String userUuid, Long dataLimitBytes, LocalDateTime expiresAt, Integer maxDevices, String description);
 
     Mono<String> getUserLink(String userUuid);
+
+    Mono<HwidGetAllResponse> getHwidDevices(String userUuid);
+
+    Mono<Void> deleteHwidDevice(String userUuid, String hwid);
+
+    Mono<Void> refreshSubscriptionPassword(String userUuid);
 }

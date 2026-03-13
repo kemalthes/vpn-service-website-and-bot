@@ -25,6 +25,7 @@ public class RabbitConfig {
     public static final String ROUTING_KEY_REQUEST = "link.request";
     public static final String ROUTING_KEY_DLX = "dlx.link.request";
     public static final String ROUTING_KEY_FAILED = "link.request.failed";
+    public static final String ROUTING_KEY_HWID_REQUEST = "hwid.request";
 
     @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
@@ -86,6 +87,11 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue hwidRequestQueue() {
+        return QueueBuilder.durable(ROUTING_KEY_HWID_REQUEST).build();
+    }
+
+    @Bean
     public Binding linkRequestBinding() {
         return BindingBuilder.bind(linkRequestQueue()).to(linkExchange()).with(ROUTING_KEY_REQUEST);
     }
@@ -98,5 +104,10 @@ public class RabbitConfig {
     @Bean
     public Binding failedRequestBinding() {
         return BindingBuilder.bind(failedRequestQueue()).to(dlxExchange()).with(ROUTING_KEY_FAILED);
+    }
+
+    @Bean
+    public Binding hwidRequestBinding() {
+        return BindingBuilder.bind(hwidRequestQueue()).to(linkExchange()).with(ROUTING_KEY_HWID_REQUEST);
     }
 }

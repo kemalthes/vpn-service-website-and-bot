@@ -1,5 +1,7 @@
 package io.nesvpn.subscribelinkservice.client;
 
+import io.nesvpn.subscribelinkservice.dto.HwidDeleteRequest;
+import io.nesvpn.subscribelinkservice.dto.HwidGetAllResponse;
 import io.nesvpn.subscribelinkservice.dto.NewUserRequest;
 import io.nesvpn.subscribelinkservice.dto.UpdateUserRequest;
 import io.nesvpn.subscribelinkservice.exception.GetLinkException;
@@ -9,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -108,7 +111,7 @@ public class RemnawaveClient implements VpnClient {
     public Mono<String> getUserLink(String userUuid) {
         log.info("[Link] Запрашиваем короткую ссылку для юзера: {}", userUuid);
         return webClient.get()
-                .uri("/api/users/" + userUuid)// Добавил проброс токена!
+                .uri("/api/users/" + userUuid)
                 .retrieve()
                 .bodyToMono(Map.class)
                 .flatMap(resp -> {
@@ -137,6 +140,61 @@ public class RemnawaveClient implements VpnClient {
                 .onErrorMap(ex -> {
                     if (ex instanceof GetLinkException) return ex;
                     return new GetLinkException();
+                });
+    }
+
+    @Override
+    public Mono<HwidGetAllResponse> getHwidDevices(String userUuid) {
+        return webClient.method(HttpMethod.GET)
+                .uri("/api/hwid/devices/" + userUuid)
+                .headers(h -> h.addAll(getAuthHeaders()))
+                .retrieve()
+                .bodyToMono(HwidGetAllResponse.class)
+                .doOnSuccess(resp -> log.info("[GetHwid] Ответ успешно получен"))
+                .doOnError(WebClientResponseException.class, ex -> log.error("[GetHwid] API вернуло HTTP ошибку! Статус: {}. Ответ: {}",
+                        ex.getStatusCode(), ex.getResponseBodyAsString()))
+                .doOnError(ex -> {
+                    if (!(ex instanceof WebClientResponseException)) {
+                        log.error("[GetHwid] Сетевая/локальная ошибка: {}", ex.getMessage());
+                    }
+                });
+    }
+
+    @Override
+    public Mono<Void> deleteHwidDevice(String userUuid, String hwid) {
+        HwidDeleteRequest hwidDeleteRequest = new HwidDeleteRequest(userUuid, hwid);
+        return webClient.method(HttpMethod.DELETE)
+                .uri("/api/hwid/devices/delete")
+                .headers(h -> h.addAll(getAuthHeaders()))
+                .bodyValue(hwidDeleteRequest)
+                .retrieve()
+                .bodyToMono(Void.class)
+                .doOnSuccess(unused -> log.info("[DeleteHwid] устройство {} удалено у юзера {}", hwid, userUuid))
+                .doOnError(WebClientResponseException.class, ex -> log.error("[DeleteHwid] API вернуло HTTP ошибку! Статус: {}. Ответ: {}",
+                        ex.getStatusCode(), ex.getResponseBodyAsString()))
+                .doOnError(ex -> {
+                    if (!(ex instanceof WebClientResponseException)) {
+                        log.error("[DeleteHwid] Сетевая/локальная ошибка: {}", ex.getMessage());
+                    }
+                });
+    }
+
+    @Override
+    public Mono<Void> refreshSubscriptionPassword(String userUuid) {
+        Map<String, Object> body = Map.of("revokeOnlyPasswords", true);
+        return webClient.method(HttpMethod.POST)
+                .uri("/api/users/" + userUuid + "/actions/revoke")
+                .headers(h -> h.addAll(getAuthHeaders()))
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(Void.class)
+                .doOnSuccess(unused -> log.info("[RefreshUser] Пользователь успешно обновлен"))
+                .doOnError(WebClientResponseException.class, ex -> log.error("[RefreshUser] API вернуло HTTP ошибку! Статус: {}. Ответ: {}",
+                        ex.getStatusCode(), ex.getResponseBodyAsString()))
+                .doOnError(ex -> {
+                    if (!(ex instanceof WebClientResponseException)) {
+                        log.error("[RefreshUser] Сетевая/локальная ошибка: {}", ex.getMessage());
+                    }
                 });
     }
 
