@@ -141,7 +141,7 @@ public class MessageHandler {
 
                 String displayName = DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId());
 
-                sendMessage(referrer.getTgId(), textFactory.newReferralText(displayName, user.getTgId()), null, "Markdown");
+                sendMessage(referrer.getTgId(), textFactory.newReferralText(displayName, user.getTgId()), null, "HTML");
             }
         }
         if (isNewUser) {
@@ -515,7 +515,7 @@ public class MessageHandler {
 
         String displayName = DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId());
 
-        editOrSendMessage(chatId, messageId, textFactory.startText(displayName), keyboardFactory.getMainMenuInline(), "Markdown");
+        editOrSendMessage(chatId, messageId, textFactory.startText(displayName), keyboardFactory.getMainMenuInline(), "HTML");
     }
 
     public void showProfile(Long chatId, Integer messageId, User user) {
@@ -529,7 +529,7 @@ public class MessageHandler {
 
         String createdAt = user.getCreatedAt() != null ? Formatter.formatMoscow(user.getCreatedAt()) : "Не указано";
 
-        editOrSendMessage(chatId, messageId, textFactory.profileText(displayName, user.getBalance(), userService.getReferralsCount(user.getTgId()), createdAt, referralLink), keyboardFactory.getBackButton(), "Markdown");
+        editOrSendMessage(chatId, messageId, textFactory.profileText(displayName, user.getBalance(), userService.getReferralsCount(user.getTgId()), createdAt, referralLink), keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showReferrals(Long chatId, Integer messageId, User user) {

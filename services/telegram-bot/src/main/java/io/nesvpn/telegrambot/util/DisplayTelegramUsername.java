@@ -17,39 +17,15 @@ public class DisplayTelegramUsername {
         try {
             Chat chat = bot.execute(new GetChat(chatId.toString()));
 
-            return escapeMarkdown(chat.getUserName() != null
+            return chat.getUserName() != null
                     ? "@" + chat.getUserName()
                     : chat.getFirstName() != null
                     ? chat.getFirstName()
-                    : "Пользователь");
+                    : "Пользователь";
 
         } catch (TelegramApiException e) {
             log.warn("Не удалось получить данные пользователя {}: {}", chatId, e.getMessage());
             return "Пользователь";
         }
-    }
-
-    public static String escapeMarkdown(String text) {
-        if (text == null) return null;
-
-        return text
-                .replace("_", "\\_")
-                .replace("*", "\\*")
-                .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replace("(", "\\(")
-                .replace(")", "\\)")
-                .replace("~", "\\~")
-                .replace("`", "\\`")
-                .replace(">", "\\>")
-                .replace("#", "\\#")
-                .replace("+", "\\+")
-                .replace("-", "\\-")
-                .replace("=", "\\=")
-                .replace("|", "\\|")
-                .replace("{", "\\{")
-                .replace("}", "\\}")
-                .replace(".", "\\.")
-                .replace("!", "\\!");
     }
 }

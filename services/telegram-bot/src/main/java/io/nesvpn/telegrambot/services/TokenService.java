@@ -58,7 +58,7 @@ public class TokenService {
 
     public List<HwidDevice> getHwidDevicesByToken(Token token) {
         if (token.getValidTo().isBefore(LocalDateTime.now())) {
-            return null;
+            return List.of();
         }
 
         UUID userVpnPanelUuid = token.getVpnPanelUserUuid();
@@ -92,7 +92,7 @@ public class TokenService {
             return inner.getDevices();
         }
 
-        return null;
+        return List.of();
     }
 
     public boolean deleteHwidDeviceByToken(Token token, String hwid) {
