@@ -387,9 +387,11 @@ public class MessageHandler {
                     "Пополнение из бота"
                 );
 
+                log.info(String.format("transaction: %s, expiresIn: %s, ", plategaResponse.getTransactionId(), plategaResponse.getExpiresIn()));
+
 
                 String transactionId = plategaResponse.getTransactionId();
-                String expiresIn = plategaResponse.getExpiresIn();
+                String expiresIn = plategaResponse.getExpiresIn() != null ?  plategaResponse.getExpiresIn() : "00:30:00";
                 String redirect = plategaResponse.getRedirect();
 
                 LocalTime time = LocalTime.parse(expiresIn);
@@ -411,6 +413,8 @@ public class MessageHandler {
             }
         } catch (Exception e) {
             log.error("Show payment with SBP", e);
+            sendMessage(chatId, textFactory.errorPlategaText(), keyboardFactory.getBackButton(), "Markdown");
+            return;
         }
 
         telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT_CRYPTO, BotState.BALANCE);
