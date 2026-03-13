@@ -2,6 +2,7 @@ package io.nesvpn.rabbitmqconfig;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

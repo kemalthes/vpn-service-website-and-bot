@@ -13,12 +13,20 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class HwidDevice {
+
     private String hwid;
+
     private UUID userUuid;
+
     private String platform;
+
     private String osVersion;
+
     private String deviceModel;
+
     private String userAgent;
+
     private OffsetDateTime createdAt;
+
     private OffsetDateTime updatedAt;
 }

@@ -163,7 +163,7 @@ public class RemnawaveClient implements VpnClient {
     @Override
     public Mono<Void> deleteHwidDevice(String userUuid, String hwid) {
         HwidDeleteRequest hwidDeleteRequest = new HwidDeleteRequest(userUuid, hwid);
-        return webClient.method(HttpMethod.DELETE)
+        return webClient.method(HttpMethod.POST)
                 .uri("/api/hwid/devices/delete")
                 .headers(h -> h.addAll(getAuthHeaders()))
                 .bodyValue(hwidDeleteRequest)

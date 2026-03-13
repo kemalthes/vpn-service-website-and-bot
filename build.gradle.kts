@@ -78,6 +78,7 @@ project(":rabbitmq-config") {
     dependencies {
         api("org.springframework.boot:spring-boot-starter-amqp")
         api("com.fasterxml.jackson.core:jackson-databind")
+        api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     }
 }
 

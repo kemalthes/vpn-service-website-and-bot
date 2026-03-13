@@ -1,9 +1,11 @@
 package io.nesvpn.telegrambot.services;
 
-import io.nesvpn.telegrambot.dto.HwidApiResponse;
-import io.nesvpn.telegrambot.dto.HwidDeleteRequest;
 import io.nesvpn.telegrambot.dto.HwidDevice;
 import io.nesvpn.telegrambot.model.Token;
+import io.nesvpn.telegrambot.rabbit.HwidMethod;
+import io.nesvpn.telegrambot.rabbit.HwidRabbitProducer;
+import io.nesvpn.telegrambot.rabbit.HwidRequest;
+import io.nesvpn.telegrambot.rabbit.HwidResponse;
 import io.nesvpn.telegrambot.repository.TokenRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,8 +13,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -23,7 +23,7 @@ import java.util.*;
 @RequiredArgsConstructor
 @Transactional
 public class TokenService {
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final HwidRabbitProducer hwidRabbitProducer;
 
     @Value("${project.vpn-host-url}")
     private String vpnHostUrl;
@@ -56,104 +56,21 @@ public class TokenService {
         return Math.max(1, Math.round(hours / 24.0));
     }
 
-    public List<HwidDevice> getHwidDevicesByToken(Token token) {
-        if (token.getValidTo().isBefore(LocalDateTime.now())) {
-            return List.of();
-        }
-
-        UUID userVpnPanelUuid = token.getVpnPanelUserUuid();
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(bearerToken);
-
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        String url = vpnPanelUrl + String.format("/api/hwid/devices/%s", userVpnPanelUuid);
-
-        ResponseEntity<HwidApiResponse> response =
-                restTemplate.exchange(
-                        url,
-                        HttpMethod.GET,
-                        entity,
-                        HwidApiResponse.class
-                );
-
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            log.error("Get HWID Devices Error status: {}, body: {} ",
-                    response.getStatusCode(),
-                    response.getBody());
-        }
-
-        HwidApiResponse body = response.getBody();
-
-        if (body != null) {
-            HwidApiResponse.Response inner = body.getResponse();
-            return inner.getDevices();
-        }
-
-        return List.of();
+    public List<HwidDevice> getHwidDevicesByToken(UUID userUuid) {
+        HwidResponse response = hwidRabbitProducer.sendHwidRequest(HwidRequest.builder()
+                .userId(userUuid)
+                .method(HwidMethod.GET_ALL)
+                .build());
+        return response.getDevices();
     }
 
-    public boolean deleteHwidDeviceByToken(Token token, String hwid) {
-        if (token.getValidTo().isBefore(LocalDateTime.now())) {
-            return false;
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(bearerToken);
-
-        String url = vpnPanelUrl + "/api/hwid/devices/delete";
-        UUID userVpnPanelUuid = token.getVpnPanelUserUuid();
-
-
-        HwidDeleteRequest request = new HwidDeleteRequest(userVpnPanelUuid, hwid);
-        HttpEntity<HwidDeleteRequest> entity = new HttpEntity<>(request, headers);
-
-        try {
-            ResponseEntity<HwidApiResponse> response =
-                    restTemplate.exchange(
-                            url,
-                            HttpMethod.POST,
-                            entity,
-                            HwidApiResponse.class
-                    );
-
-            return response.getStatusCode().is2xxSuccessful() && refreshSubscriptionPasswords(userVpnPanelUuid);
-
-        } catch (RestClientException e) {
-            log.error("Delete HWID Device request failed: {}", e.getMessage(), e);
-            return false;
-        }
-    }
-
-    public boolean refreshSubscriptionPasswords(UUID vpnPanelUserUuid) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(bearerToken);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("revokeOnlyPasswords", true);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-
-        String url = vpnPanelUrl + "/api/users/" + vpnPanelUserUuid + "/actions/revoke";
-
-        try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
-
-            return response.getStatusCode().is2xxSuccessful();
-
-        } catch (RestClientException e) {
-            log.error("Revoke subscription request failed: {}", e.getMessage(), e);
-            return false;
-        }
+    public boolean deleteHwidDeviceByToken(UUID userUuid, String hwid) {
+        HwidResponse response = hwidRabbitProducer.sendHwidRequest(HwidRequest.builder()
+                .userId(userUuid)
+                .method(HwidMethod.DELETE)
+                .hwid(hwid)
+                .build());
+        return response.isSuccess();
     }
 
     public List<Token> getExpiringTokens(LocalDateTime now, LocalDateTime twoDaysLater) {

@@ -1,5 +1,6 @@
 package io.nesvpn.telegrambot.rabbit;
 
+import io.nesvpn.telegrambot.dto.HwidDevice;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

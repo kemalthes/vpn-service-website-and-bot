@@ -643,7 +643,11 @@ public class MessageHandler {
             long daysLeft = tokenService.getDaysLeft(token);
             boolean isActive = token.isActive();
             String tokenUrl = tokenService.getFullTokenUrl(token);
-            List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(token);
+            List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(user.getId());
+            if (hwidDevices == null) {
+                //TODO написать ошибка запроса
+                return;
+            }
             Integer devicesCount = hwidDevices.size();
             String validTo = token.getValidTo() != null
                     ? Formatter.formatMoscow(token.getValidTo())
@@ -664,8 +668,10 @@ public class MessageHandler {
             return;
         }
 
-        List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(token);
-
+        List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(user.getId());
+        if (hwidDevices == null) {
+            //TODO что-то писать тоже
+        }
         editOrSendMessage(chatId, messageId, textFactory.hwidDevicesText(hwidDevices), keyboardFactory.getHwidDevicesKeyboard(hwidDevices), "HTML");
     }
 
@@ -684,7 +690,7 @@ public class MessageHandler {
             return;
         }
 
-        boolean isSuccess = tokenService.deleteHwidDeviceByToken(token, hwid);
+        boolean isSuccess = tokenService.deleteHwidDeviceByToken(user.getId(), hwid);
         editOrSendMessage(chatId, messageId, isSuccess ? textFactory.hwidDeviceDeleteSuccess() : textFactory.hwidDeviceDeleteError(), keyboardFactory.getBackButton(), "HTML");
     }
 
