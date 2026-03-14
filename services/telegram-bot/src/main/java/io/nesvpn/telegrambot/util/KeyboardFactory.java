@@ -7,6 +7,7 @@ import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.model.VpnPlan;
 import io.nesvpn.telegrambot.services.PaymentService;
 import io.nesvpn.telegrambot.services.TonPaymentService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Component
 public class KeyboardFactory {
     private final PaymentService paymentService;
@@ -274,7 +276,22 @@ public class KeyboardFactory {
                     ? Formatter.formatMoscow(device.getCreatedAt().toLocalDateTime(), "dd.MM")
                     : "";
 
-            String text = "📱 " + model + " • " + date;
+            String deviceClient = device.getUserAgent().toLowerCase().replace(" ", "");
+            String clientText = null;
+            if (deviceClient.contains("happ")) {
+                clientText = "Happ";
+            } else if (deviceClient.contains("flclashx")) {
+                clientText = "Flclash X";
+            } else if (deviceClient.contains("koala-clash")) {
+                clientText = "Koala Clash";
+            }
+
+            int MAX_LEN = 64;
+            String text = "📱 " + (clientText != null ? clientText + " • " : "") + model + " • " + date;
+
+            if (text.length() > MAX_LEN) {
+                text = text.substring(0, MAX_LEN);
+            }
 
             button.setText(text);
             button.setCallbackData("delete_hwid_confirm_" + device.getHwid());
