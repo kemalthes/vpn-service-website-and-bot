@@ -68,8 +68,13 @@ public class UpdateTokenService {
                         log.error("[UpdateTokenService] Тариф {} не найден!", planId);
                         return new RuntimeException("Plan not found");
                     });
-
-                    LocalDateTime expiresAt = token.getValidTo().plusDays(plan.getDuration());
+                    LocalDateTime expiresAt;
+                    LocalDateTime now = LocalDateTime.now();
+                    if (token.getValidTo().isBefore(now)) {
+                        expiresAt = now.plusDays(plan.getDuration());
+                    } else {
+                        expiresAt = token.getValidTo().plusDays(plan.getDuration());
+                    }
                     log.info("[UpdateTokenService] Продлеваем: старая дата {}, новая дата {}", token.getValidTo(), expiresAt);
 
                     log.info("[UpdateTokenService] Отправляем PATCH запрос в Remnawave для UUID: {}", token.getVpnPanelUserUuid());
