@@ -235,7 +235,7 @@ public class TextFactory {
         
         ✅ Вы успешно оплатили подписку!
         
-        Ожидайте в течение пару минут,
+        Ожидайте, в течение пары секунд
         ваша ссылка обновится.
         """;
     }
@@ -581,7 +581,7 @@ public class TextFactory {
 
     public String startText(String displayName) {
         return String.format("""
-            👋 Добро пожаловать в <b>NesVPN</b>, <b>%s</b> (ver 2)
+            👋 Добро пожаловать в <b>NesVPN</b>, <b>%s</b>
             
             🔐 <b>Быстрый, безопасный и стабильный VPN для повседневного использования</b>
             
