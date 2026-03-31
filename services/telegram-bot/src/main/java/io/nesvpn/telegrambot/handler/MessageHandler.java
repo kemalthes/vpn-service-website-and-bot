@@ -40,6 +40,7 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class MessageHandler {
+    private static final long FREE_PLAN_ID = 4L;
 
     private final VpnBot vpnBot;
     private final UserService userService;
@@ -56,6 +57,7 @@ public class MessageHandler {
     private final CooldownService cooldownService;
     private final PlategaService plategaService;
     private final TextFactory textFactory;
+    private final FreeSubscriptionAwaitService freeSubscriptionAwaitService;
 
     public MessageHandler(
             UserService userService,
@@ -70,7 +72,10 @@ public class MessageHandler {
             FloatRatesService floatRatesService,
             TonPaymentService tonPaymentService,
             PaymentService paymentService,
-            CooldownService cooldownService, PlategaService plategaService, TextFactory textFactory) {
+            CooldownService cooldownService,
+            PlategaService plategaService,
+            TextFactory textFactory,
+            FreeSubscriptionAwaitService freeSubscriptionAwaitService) {
         this.userService = userService;
         this.telegramUserService = telegramUserService;
         this.referralService = referralService;
@@ -86,6 +91,7 @@ public class MessageHandler {
         this.vpnBot = vpnBot;
         this.plategaService = plategaService;
         this.textFactory = textFactory;
+        this.freeSubscriptionAwaitService = freeSubscriptionAwaitService;
     }
 
     public void handle(Message message) {
@@ -638,7 +644,11 @@ public class MessageHandler {
 
         Token token = tokenService.getUserToken(user.getId());
         if (token == null) {
-            editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+            if (!orderService.orderExists(user.getId(), FREE_PLAN_ID)) {
+                editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getSubscriptionKeyboardFirst(user.getId()), "HTML");
+            } else {
+                editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+            }
         } else {
             long daysLeft = tokenService.getDaysLeft(token);
             boolean isActive = token.isActive();
@@ -652,7 +662,6 @@ public class MessageHandler {
             String validTo = token.getValidTo() != null
                     ? Formatter.formatMoscow(token.getValidTo())
                     : "Не указано";
-
             editOrSendMessage(chatId, messageId, textFactory.subscriptionText(isActive, tokenUrl, validTo, daysLeft, devicesCount), keyboardFactory.getSubscriptionKeyboard(token.isActive(), devicesCount), "HTML");
         }
     }
@@ -701,7 +710,11 @@ public class MessageHandler {
         Token token = tokenService.getUserToken(user.getId());
 
         if (token == null) {
-            editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+            if (!orderService.orderExists(user.getId(), FREE_PLAN_ID)) {
+                editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getSubscriptionKeyboardFirst(user.getId()), "HTML");
+            } else {
+                editOrSendMessage(chatId, messageId, textFactory.tokenNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+            }
             return;
         }
 
@@ -714,6 +727,37 @@ public class MessageHandler {
         List<VpnPlan> plans = vpnPlanService.getAllPlans();
 
         editOrSendMessage(chatId, messageId, textFactory.extendSubscriptionText(user.getBalance(), validTo, daysLeft), keyboardFactory.getExtendPlansKeyboard(token.getId(), plans), "HTML");
+    }
+
+    public void processFreeSubscription(Long chatId, Integer messageId, User user, UUID callbackUserId) {
+        if (!user.getId().equals(callbackUserId)) {
+            log.warn("Free subscription callback user mismatch. callbackUserId={}, currentUserId={}", callbackUserId, user.getId());
+            showSubscription(chatId, messageId, user);
+            return;
+        }
+        if (orderService.orderExists(user.getId(), FREE_PLAN_ID)) {
+            showSubscription(chatId, messageId, user);
+            return;
+        }
+        VpnPlan freePlan = vpnPlanService.findById(FREE_PLAN_ID).orElse(null);
+        if (freePlan == null) {
+            editOrSendMessage(chatId, messageId, textFactory.dataNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+            return;
+        }
+        orderService.createOrder(user, freePlan);
+        editOrSendMessage(chatId, messageId, textFactory.successSubscribeProvidedText(), null, "HTML");
+        freeSubscriptionAwaitService.waitForFreeSubscriptionAndShow(
+                chatId,
+                user,
+                refreshedUser -> showSubscription(chatId, null, refreshedUser),
+                () -> sendMessage(
+                        chatId,
+                        "⏳ Не получилось сразу обновить подписку. Проверьте раздел «Подписка» через пару минут.",
+                        keyboardFactory.getBackToSubscriptionKeyboard(),
+                        "HTML"
+                )
+        );
+
     }
 
     public void showSubscriptionExpiring(Long chatId, String validTo) {

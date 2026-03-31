@@ -11,6 +11,8 @@ import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.util.UUID;
+
 @Slf4j
 @Service
 public class CallbackQueryHandler {
@@ -41,60 +43,24 @@ public class CallbackQueryHandler {
         User user = userService.findOrCreateByTgId(tgId);
 
         switch (data) {
-            case "start" -> {
-                messageHandler.showStart(chatId, messageId, user);
-            }
-            case "back" -> {
-                handleBack(chatId, messageId, user);
-            }
-            case "profile" -> {
-                messageHandler.showProfile(chatId, messageId, user);
-            }
-            case "referrals" -> {
-                messageHandler.showReferrals(chatId, messageId, user);
-            }
-            case "instructions" -> {
-                messageHandler.showInstructions(chatId, messageId, user);
-            }
-            case "instructions_android" -> {
-                messageHandler.showAndroidInstructions(chatId, messageId, user);
-            }
-            case "instructions_ios" -> {
-                messageHandler.showIosInstructions(chatId, messageId, user);
-            }
-            case "instructions_windows" -> {
-                messageHandler.showWindowsInstructions(chatId, messageId, user);
-            }
-            case "instructions_macos" -> {
-                messageHandler.showMacosInstructions(chatId, messageId, user);
-            }
-            case "balance" -> {
-                messageHandler.showBalance(chatId, messageId, user);
-            }
-            case "balance_history" -> {
-                messageHandler.showBalanceHistory(chatId, messageId, user);
-            }
-            case "balance_topup" -> {
-                messageHandler.showTopUp(chatId, messageId);
-            }
-            case "payment_method_sbp" -> {
-                messageHandler.showAwaitingBalance(chatId, messageId, user);
-            }
-            case "payment_method_usdt" -> {
-                messageHandler.showAwaitingBalanceWithCrypto(chatId, messageId, user);
-            }
-            case "subscription" -> {
-                messageHandler.showSubscription(chatId, messageId, user);
-            }
-            case "subscription_devices" -> {
-                messageHandler.showHwidDevices(chatId, messageId, user);
-            }
-            case "subscription_extend" -> {
-                messageHandler.showSubscriptionExtend(chatId, messageId, user);
-            }
-            case "info" -> {
-                messageHandler.showAboutService(chatId, messageId);
-            }
+            case "start" -> messageHandler.showStart(chatId, messageId, user);
+            case "back" -> handleBack(chatId, messageId, user);
+            case "profile" -> messageHandler.showProfile(chatId, messageId, user);
+            case "referrals" -> messageHandler.showReferrals(chatId, messageId, user);
+            case "instructions" -> messageHandler.showInstructions(chatId, messageId, user);
+            case "instructions_android" -> messageHandler.showAndroidInstructions(chatId, messageId, user);
+            case "instructions_ios" -> messageHandler.showIosInstructions(chatId, messageId, user);
+            case "instructions_windows" -> messageHandler.showWindowsInstructions(chatId, messageId, user);
+            case "instructions_macos" -> messageHandler.showMacosInstructions(chatId, messageId, user);
+            case "balance" -> messageHandler.showBalance(chatId, messageId, user);
+            case "balance_history" -> messageHandler.showBalanceHistory(chatId, messageId, user);
+            case "balance_topup" -> messageHandler.showTopUp(chatId, messageId);
+            case "payment_method_sbp" -> messageHandler.showAwaitingBalance(chatId, messageId, user);
+            case "payment_method_usdt" -> messageHandler.showAwaitingBalanceWithCrypto(chatId, messageId, user);
+            case "subscription" -> messageHandler.showSubscription(chatId, messageId, user);
+            case "subscription_devices" -> messageHandler.showHwidDevices(chatId, messageId, user);
+            case "subscription_extend" -> messageHandler.showSubscriptionExtend(chatId, messageId, user);
+            case "info" -> messageHandler.showAboutService(chatId, messageId);
         }
 
         if (data.startsWith("check_payment_sbp")) {
@@ -122,6 +88,14 @@ public class CallbackQueryHandler {
             String hwid = data.replace("delete_hwid_confirmation_", "");
             log.info("showDeleteHwidDevice CALLED");
             messageHandler.showDeleteHwidDevice(chatId, messageId, hwid, user);
+        } else if (data.startsWith("get_2_days_free_")) {
+            String[] parts = data.replace("get_2_days_free_", "").split("_");
+            try {
+                UUID userId = UUID.fromString(parts[0]);
+                messageHandler.processFreeSubscription(chatId, messageId, user, userId);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid free subscription callback payload: {}", data, e);
+            }
         }
     }
 
@@ -132,9 +106,6 @@ public class CallbackQueryHandler {
         telegramUserService.goToPreviousState(userId);
 
         switch (previousState) {
-            case START:
-                messageHandler.showStart(chatId, messageId, user);
-                break;
             case PROFILE:
                 messageHandler.showProfile(chatId, messageId, user);
                 break;
@@ -159,6 +130,7 @@ public class CallbackQueryHandler {
             case SUBSCRIPTIONS_EXTEND:
                 messageHandler.showSubscriptionExtend(chatId, messageId, user);
                 break;
+            case START:
             default:
                 messageHandler.showStart(chatId, messageId, user);
         }
