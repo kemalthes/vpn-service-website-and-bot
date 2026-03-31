@@ -5,6 +5,7 @@ import io.nesvpn.telegrambot.dto.HwidDevice;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.model.VpnPlan;
+import io.nesvpn.telegrambot.services.OrderService;
 import io.nesvpn.telegrambot.services.PaymentService;
 import io.nesvpn.telegrambot.services.TonPaymentService;
 import lombok.extern.slf4j.Slf4j;
@@ -16,12 +17,16 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Component
 public class KeyboardFactory {
+
     private final PaymentService paymentService;
     private final TonPaymentService tonPaymentService;
+    private final OrderService orderService;
+
     @Value("${bot.channel.username}")
     private String channelUsername;
 
@@ -34,7 +39,8 @@ public class KeyboardFactory {
     @Value("${platega.merchant-id}")
     private String merchantId;
 
-    public KeyboardFactory(PaymentService paymentService, TonPaymentService tonPaymentService) {
+    public KeyboardFactory(PaymentService paymentService, TonPaymentService tonPaymentService, OrderService orderService) {
+        this.orderService = orderService;
         this.paymentService = paymentService;
         this.tonPaymentService = tonPaymentService;
     }
@@ -456,6 +462,37 @@ public class KeyboardFactory {
         return markup;
     }
 
+    public InlineKeyboardMarkup getSubscriptionKeyboardFirst(UUID userId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+
+        InlineKeyboardButton extendBtn = new InlineKeyboardButton();
+        extendBtn.setText("Получить 2 дня бесплатно");
+        extendBtn.setCallbackData("get_2_days_free_" + userId);
+        row1.add(extendBtn);
+        rows.add(row1);
+
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton instructionBtn = new InlineKeyboardButton();
+        instructionBtn.setText("📖 Инструкция");
+        instructionBtn.setCallbackData("instructions");
+        row2.add(instructionBtn);
+        rows.add(row2);
+
+        List<InlineKeyboardButton> row3 = new ArrayList<>();
+        InlineKeyboardButton backBtn = new InlineKeyboardButton();
+        backBtn.setText("◀️ Назад");
+        backBtn.setCallbackData("back");
+        row3.add(backBtn);
+        rows.add(row3);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+
     public InlineKeyboardMarkup getExtendPlansKeyboard(Long tokenId, List<VpnPlan> plans) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -517,3 +554,5 @@ public class KeyboardFactory {
         return markup;
     }
 }
+
+

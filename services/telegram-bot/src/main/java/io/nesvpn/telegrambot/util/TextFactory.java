@@ -51,9 +51,10 @@ public class TextFactory {
 
         return String.format("""
         💸 <b>Пополнение баланса криптовалютой</b>
-
+        
         💰 Сумма в рублях: <b>%s руб</b>
         💎 USDT: <code>%s</code> $
+        💳 Address: <code>%s</code>
         📝 Memo: <code>%s</code>
 
         ⏳ <b>Действителен до:</b> %s (по мск)
@@ -71,6 +72,7 @@ public class TextFactory {
         """,
                 cryptoPayment.getAmountRub(),
                 cryptoPayment.getAmountUsdt(),
+                cryptoPayment.getWalletAddress(),
                 cryptoPayment.getTransactionId(),
                 expiryTime,
                 cryptoPayment.getTonLink());
@@ -233,7 +235,7 @@ public class TextFactory {
         
         ✅ Вы успешно оплатили подписку!
         
-        Ожидайте в течение пару минут,
+        Ожидайте, в течение пары секунд
         ваша ссылка обновится.
         """;
     }
@@ -326,8 +328,8 @@ public class TextFactory {
     }
 
     public String subscriptionText(Boolean isActive, String tokenUrl, String validTo, Long daysLeft, Integer devicesCount) {
-        String statusEmoji = isActive ? "✅" : "❌";
-        String statusText = isActive ? "Активна" : "Истекла";
+        String statusEmoji = Boolean.TRUE.equals(isActive) ? "✅" : "❌";
+        String statusText = Boolean.TRUE.equals(isActive) ? "Активна" : "Истекла";
 
         return String.format("""
             📱 <b>Ваша подписка</b>
@@ -405,7 +407,7 @@ public class TextFactory {
             String sign = tx.getAmount().compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
 
             historyText.append(String.format(
-                    "<b>%s %s%.2f₽</b>\n<i>%s</i>\n%s\n\n",
+                    "<b>%s %s%.2f₽</b>%n<i>%s</i>%n%s%n%n",
                     tx.getType().getDisplayName(),
                     sign,
                     tx.getAmount(),
