@@ -38,6 +38,12 @@ public class BroadcastCampaign {
     @Column(name = "source_message_id", nullable = false)
     private Integer sourceMessageId;
 
+    @Column(name = "message_text", columnDefinition = "TEXT")
+    private String messageText;
+
+    @Column(name = "message_entities", columnDefinition = "TEXT")
+    private String messageEntities;
+
     @Column(name = "admin_tg_id")
     private Long adminTgId;
 
@@ -57,7 +63,7 @@ public class BroadcastCampaign {
     @PrePersist
     protected void onCreate() {
         if (status == null) {
-            status = BroadcastCampaignStatus.PROCESSING;
+            status = BroadcastCampaignStatus.PREPARING;
         }
         if (totalRecipients == null) {
             totalRecipients = 0;

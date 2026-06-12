@@ -37,8 +37,6 @@ management:
 bot:
   token: ${BOT_TOKEN}
   username: ${BOT_USERNAME}
-  channel:
-    username: ${BOT_CHANNEL_USERNAME}
   support: ${BOT_SUPPORT}
 
 project:

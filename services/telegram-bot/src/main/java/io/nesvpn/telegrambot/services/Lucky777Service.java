@@ -1,5 +1,8 @@
 package io.nesvpn.telegrambot.services;
 
+import io.nesvpn.telegrambot.dto.lucky777.Lucky777AvailableNotification;
+import io.nesvpn.telegrambot.dto.lucky777.Lucky777Result;
+import io.nesvpn.telegrambot.dto.lucky777.Lucky777Status;
 import io.nesvpn.telegrambot.model.Lucky777Spin;
 import io.nesvpn.telegrambot.model.Token;
 import io.nesvpn.telegrambot.model.User;
@@ -169,30 +172,4 @@ public class Lucky777Service {
         return "LOSE";
     }
 
-    public record Lucky777Status(boolean canSpin, Duration remaining) {
-    }
-
-    public record Lucky777AvailableNotification(UUID userId, LocalDateTime lastSpinAt) {
-    }
-
-    public record Lucky777Result(
-            Integer diceValue,
-            Integer rewardDays,
-            String result,
-            boolean processed,
-            boolean noToken,
-            Duration remaining
-    ) {
-        public static Lucky777Result processed(Integer diceValue, Integer rewardDays, String result) {
-            return new Lucky777Result(diceValue, rewardDays, result, true, false, Duration.ZERO);
-        }
-
-        public static Lucky777Result cooldown(Integer diceValue, Duration remaining) {
-            return new Lucky777Result(diceValue, 0, "COOLDOWN", false, false, remaining);
-        }
-
-        public static Lucky777Result noToken(Integer diceValue) {
-            return new Lucky777Result(diceValue, 0, "NO_TOKEN", false, true, Duration.ZERO);
-        }
-    }
 }

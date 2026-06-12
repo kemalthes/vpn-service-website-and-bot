@@ -75,3 +75,12 @@ databaseChangeLog:
   - include:
       file: ddl/20260612-create-broadcast-tables.yml
       relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-update-user-roles.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-update-broadcast-processing-statuses.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-add-broadcast-message-columns.yml
+      relativeToChangelogFile: true

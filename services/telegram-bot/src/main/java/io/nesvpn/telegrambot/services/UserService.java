@@ -1,5 +1,6 @@
 package io.nesvpn.telegrambot.services;
 
+import io.nesvpn.telegrambot.enums.UserRole;
 import io.nesvpn.telegrambot.model.Order;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.repository.UserRepository;
@@ -33,7 +34,7 @@ public class UserService {
         User user = new User();
         user.setId(UUID.randomUUID());
         user.setTgId(tgId);
-        user.setRole("user");
+        user.setRole(UserRole.USER.getValue());
         user.setReferralCode(referralService.generateReferralCode(tgId));
         user.setBalance(BigDecimal.ZERO);
         user.setCreatedAt(LocalDateTime.now());

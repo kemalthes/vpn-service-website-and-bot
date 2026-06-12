@@ -1,5 +1,6 @@
 package io.nesvpn.telegrambot.services;
 
+import io.nesvpn.telegrambot.dto.notification.DueSubscriptionExpirationNotification;
 import io.nesvpn.telegrambot.enums.SubscriptionExpirationNotificationType;
 import io.nesvpn.telegrambot.model.SubscriptionExpirationNotification;
 import io.nesvpn.telegrambot.model.Token;
@@ -16,7 +17,6 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -177,11 +177,4 @@ public class SubscriptionExpirationNotificationService {
         };
     }
 
-    public record DueSubscriptionExpirationNotification(
-            Long tokenId,
-            UUID userId,
-            LocalDateTime validTo,
-            SubscriptionExpirationNotificationType type
-    ) {
-    }
 }

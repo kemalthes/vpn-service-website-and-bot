@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 35-add-broadcast-message-columns
+      author: bulat
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE broadcast_campaigns
+              ADD COLUMN IF NOT EXISTS message_text TEXT;
+
+              ALTER TABLE broadcast_campaigns
+              ADD COLUMN IF NOT EXISTS message_entities TEXT;

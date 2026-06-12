@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 33-update-user-roles
+      author: bulat
+      changes:
+        - sql:
+            sql: |
+              UPDATE users
+              SET role = 'user';
+
+              UPDATE users
+              SET role = 'admin'
+              WHERE id IN (
+                  '013c2161-4114-42a2-b050-68e966776f99'::uuid,
+                  '79c1c8bc-0765-4dd7-8533-a27611d8a294'::uuid
+              );

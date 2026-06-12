@@ -120,9 +120,6 @@ public class KeyboardFactory {
     private final TonPaymentService tonPaymentService;
     private final OrderService orderService;
 
-    @Value("${bot.channel.username}")
-    private String channelUsername;
-
     @Value("${bot.support}")
     private String support;
 
@@ -206,13 +203,6 @@ public class KeyboardFactory {
             row3.add(broadcastBtn);
         }
         rows.add(row3);
-
-        List<InlineKeyboardButton> row4 = new ArrayList<>();
-        InlineKeyboardButton channelBtn = inlineButton("Наш канал", ButtonIcon.CHANNEL);
-        channelBtn.setUrl("https://t.me/nesvpn");
-
-        row4.add(channelBtn);
-        rows.add(row4);
 
         markup.setKeyboard(rows);
         return markup;
@@ -317,24 +307,6 @@ public class KeyboardFactory {
         return keyboard;
     }
 
-    public InlineKeyboardMarkup getSubscribeChannelKeyboard() {
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-
-        String channelLink = "https://t.me/" + channelUsername;
-
-        List<InlineKeyboardButton> row1 = new ArrayList<>();
-
-        InlineKeyboardButton titleButton = inlineButton("Подписаться на канал", ButtonIcon.CHANNEL);
-        titleButton.setUrl(channelLink);
-        row1.add(titleButton);
-
-        rows.add(row1);
-
-        keyboard.setKeyboard(rows);
-        return keyboard;
-    }
-
     public InlineKeyboardMarkup getInfoButton() {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
@@ -381,6 +353,20 @@ public class KeyboardFactory {
 
     public InlineKeyboardMarkup getBroadcastAwaitingPostKeyboard() {
         return getBackButton();
+    }
+
+    public InlineKeyboardMarkup getBroadcastProgressKeyboard(Long campaignId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton refreshBtn = inlineButton("Обновить", ButtonIcon.REFRESH, STYLE_SUCCESS);
+        refreshBtn.setCallbackData("broadcast_refresh_" + campaignId);
+        row.add(refreshBtn);
+        rows.add(row);
+
+        markup.setKeyboard(rows);
+        return markup;
     }
 
     public InlineKeyboardMarkup getBroadcastHomeKeyboard() {

@@ -1,20 +1,24 @@
 package io.nesvpn.telegrambot.services;
 
-import io.nesvpn.telegrambot.handler.MessageHandler;
-import io.nesvpn.telegrambot.handler.MessageHandler.BroadcastDeliveryResult;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastDeliveryResult;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastStats;
+import io.nesvpn.telegrambot.dto.lucky777.Lucky777AvailableNotification;
+import io.nesvpn.telegrambot.dto.notification.DueSubscriptionExpirationNotification;
+import io.nesvpn.telegrambot.handler.sections.BalancePaymentHandler;
+import io.nesvpn.telegrambot.handler.sections.BroadcastHandler;
+import io.nesvpn.telegrambot.handler.sections.Lucky777Handler;
+import io.nesvpn.telegrambot.handler.sections.SubscriptionHandler;
 import io.nesvpn.telegrambot.model.BroadcastCampaign;
 import io.nesvpn.telegrambot.model.BroadcastRecipient;
 import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.model.User;
-import io.nesvpn.telegrambot.services.Lucky777Service.Lucky777AvailableNotification;
-import io.nesvpn.telegrambot.services.BroadcastService.BroadcastStats;
-import io.nesvpn.telegrambot.services.SubscriptionExpirationNotificationService.DueSubscriptionExpirationNotification;
 import io.nesvpn.telegrambot.util.Formatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,9 +35,14 @@ public class ScheduledTasksService {
     private static final int BROADCAST_BATCH_SIZE = 30;
     private static final int BROADCAST_COMPLETED_CAMPAIGNS_BATCH_SIZE = 20;
     private static final long BROADCAST_SEND_DELAY_MS = 1000L;
+    private static final long BROADCAST_RECIPIENTS_CLEANUP_DELAY_MS = 86400000L;
+    private static final int BROADCAST_RECIPIENTS_RETENTION_DAYS = 1;
 
     private final PaymentService paymentService;
-    private final MessageHandler messageHandler;
+    private final BalancePaymentHandler balancePaymentHandler;
+    private final Lucky777Handler lucky777Handler;
+    private final SubscriptionHandler subscriptionHandler;
+    private final BroadcastHandler broadcastHandler;
     private final UserService userService;
     private final Lucky777Service lucky777Service;
     private final SubscriptionExpirationNotificationService subscriptionExpirationNotificationService;
@@ -56,7 +65,7 @@ public class ScheduledTasksService {
         for (Payment payment : markedPayment) {
             User user = userMap.get(payment.getUserId());
             if (user != null && user.getTgId() != null) {
-                messageHandler.showExpiredPayment(user.getTgId(), payment.getTransactionToken());
+                balancePaymentHandler.showExpiredPayment(user.getTgId(), payment.getTransactionToken());
             }
         }
     }
@@ -91,7 +100,7 @@ public class ScheduledTasksService {
         for (Payment payment : confirmedPayments) {
             User user = userMap.get(payment.getUserId());
             if (user != null) {
-                messageHandler.showSuccessPayment(user.getTgId(), payment, user);
+                balancePaymentHandler.showSuccessPayment(user.getTgId(), payment, user);
             }
         }
     }
@@ -128,7 +137,7 @@ public class ScheduledTasksService {
             }
 
             try {
-                if (messageHandler.showLucky777AvailableNotification(user.getTgId())) {
+                if (lucky777Handler.showLucky777AvailableNotification(user.getTgId())) {
                     sentNotifications.add(notification);
                 }
             } catch (Exception e) {
@@ -199,7 +208,7 @@ public class ScheduledTasksService {
             }
 
             try {
-                if (messageHandler.showSubscriptionExpirationNotification(
+                if (subscriptionHandler.showSubscriptionExpirationNotification(
                         user.getTgId(),
                         notification.type(),
                         Formatter.formatMoscow(notification.validTo())
@@ -229,7 +238,17 @@ public class ScheduledTasksService {
 
         List<BroadcastStats> completedCampaigns =
                 broadcastService.completeReadyCampaigns(BROADCAST_COMPLETED_CAMPAIGNS_BATCH_SIZE);
-        completedCampaigns.forEach(messageHandler::showBroadcastStats);
+        completedCampaigns.forEach(broadcastHandler::showBroadcastStats);
+    }
+
+    @Scheduled(fixedDelay = BROADCAST_RECIPIENTS_CLEANUP_DELAY_MS)
+    public void cleanupOldBroadcastRecipients() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(BROADCAST_RECIPIENTS_RETENTION_DAYS);
+        int deleted = broadcastService.deleteOldFinishedCampaignRecipients(cutoff);
+
+        if (deleted > 0) {
+            log.info("Old broadcast recipients cleaned: deleted={}, cutoff={}", deleted, cutoff);
+        }
     }
 
     private void sendBroadcastBatch(List<BroadcastRecipient> recipients) {
@@ -269,7 +288,7 @@ public class ScheduledTasksService {
                 continue;
             }
 
-            BroadcastDeliveryResult result = messageHandler.copyBroadcastMessage(recipient, campaign);
+            BroadcastDeliveryResult result = broadcastHandler.copyBroadcastMessage(recipient, campaign);
             if (result.success()) {
                 broadcastService.markRecipientSent(recipient, result.sentMessageId());
                 sentCount++;

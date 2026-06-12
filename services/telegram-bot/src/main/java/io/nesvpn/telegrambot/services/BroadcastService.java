@@ -1,24 +1,39 @@
 package io.nesvpn.telegrambot.services;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastCreateResult;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastProgress;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastProgressProjection;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastStats;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastStatsProjection;
 import io.nesvpn.telegrambot.enums.BroadcastCampaignSource;
 import io.nesvpn.telegrambot.enums.BroadcastCampaignStatus;
 import io.nesvpn.telegrambot.enums.BroadcastRecipientStatus;
+import io.nesvpn.telegrambot.enums.UserRole;
 import io.nesvpn.telegrambot.model.BroadcastCampaign;
 import io.nesvpn.telegrambot.model.BroadcastRecipient;
 import io.nesvpn.telegrambot.repository.BroadcastCampaignRepository;
 import io.nesvpn.telegrambot.repository.BroadcastRecipientRepository;
+import io.nesvpn.telegrambot.repository.UserRepository;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.MessageEntity;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,41 +41,34 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class BroadcastService {
-    private static final String SOURCE_CHANNEL_ID = "3000857338";
-    private static final Set<Long> ADMIN_IDS = Set.of(5311630558L, 7378974496L);
+    private static final EnumSet<BroadcastCampaignStatus> ACTIVE_CAMPAIGN_STATUSES = EnumSet.of(
+            BroadcastCampaignStatus.PREPARING,
+            BroadcastCampaignStatus.PROCESSING
+    );
 
     private final BroadcastCampaignRepository broadcastCampaignRepository;
     private final BroadcastRecipientRepository broadcastRecipientRepository;
+    private final UserRepository userRepository;
+    private final TransactionTemplate transactionTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ExecutorService recipientPreparationExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "broadcast-recipient-preparation");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public boolean isAdmin(Long tgId) {
-        return tgId != null && ADMIN_IDS.contains(tgId);
+        return tgId != null && userRepository.existsByTgIdAndRoleIgnoreCase(tgId, UserRole.ADMIN.getValue());
     }
 
     public List<Long> getAdminIds() {
-        return ADMIN_IDS.stream().toList();
+        return userRepository.findTgIdsByRole(UserRole.ADMIN.getValue());
     }
 
-    public boolean isSourceChannel(Message message) {
-        if (message == null || message.getChatId() == null) {
-            return false;
-        }
-
-        String chatId = String.valueOf(Math.abs(message.getChatId()));
-        return chatId.equals(SOURCE_CHANNEL_ID) || chatId.endsWith(SOURCE_CHANNEL_ID);
-    }
-
-    @Transactional
-    public BroadcastCreateResult createFromChannelPost(Message message) {
-        if (!isSourceChannel(message)) {
-            return BroadcastCreateResult.ignored();
-        }
-
-        return createCampaign(
-                BroadcastCampaignSource.CHANNEL,
-                message.getChatId(),
-                message.getMessageId(),
-                null
-        );
+    @Transactional(readOnly = true)
+    public Optional<BroadcastProgress> getProgress(Long campaignId) {
+        return broadcastCampaignRepository.findProgressByCampaignId(campaignId)
+                .map(this::toBroadcastProgress);
     }
 
     @Transactional
@@ -73,16 +81,15 @@ public class BroadcastService {
                 BroadcastCampaignSource.ADMIN,
                 message.getChatId(),
                 message.getMessageId(),
+                message.hasText() ? message.getText() : null,
+                message.hasText() ? serializeEntities(message.getEntities()) : null,
                 message.getFrom().getId()
         );
     }
 
     @Transactional(readOnly = true)
     public List<BroadcastRecipient> findPendingRecipients(int limit) {
-        return broadcastRecipientRepository.findByStatusOrderByIdAsc(
-                BroadcastRecipientStatus.PENDING,
-                PageRequest.of(0, limit)
-        );
+        return broadcastRecipientRepository.findPendingRecipientsForProcessingCampaigns(limit);
     }
 
     @Transactional(readOnly = true)
@@ -111,24 +118,22 @@ public class BroadcastService {
 
     @Transactional
     public List<BroadcastStats> completeReadyCampaigns(int limit) {
-        List<BroadcastCampaign> campaigns = broadcastCampaignRepository.findByStatusOrderByCreatedAtAsc(
-                BroadcastCampaignStatus.PROCESSING,
-                PageRequest.of(0, limit)
-        );
-
-        return campaigns.stream()
-                .filter(campaign -> !broadcastRecipientRepository.existsByCampaignIdAndStatus(
-                        campaign.getId(),
-                        BroadcastRecipientStatus.PENDING
-                ))
-                .map(this::completeCampaign)
+        return broadcastCampaignRepository.completeReadyCampaigns(limit).stream()
+                .map(this::toBroadcastStats)
                 .toList();
+    }
+
+    @Transactional
+    public int deleteOldFinishedCampaignRecipients(LocalDateTime createdBefore) {
+        return broadcastRecipientRepository.deleteFinishedCampaignRecipientsCreatedBefore(createdBefore);
     }
 
     private BroadcastCreateResult createCampaign(
             BroadcastCampaignSource source,
             Long sourceChatId,
             Integer sourceMessageId,
+            String messageText,
+            String messageEntities,
             Long adminTgId
     ) {
         Optional<BroadcastCampaign> existingCampaign =
@@ -138,7 +143,7 @@ public class BroadcastService {
         }
 
         Optional<BroadcastCampaign> activeCampaign =
-                broadcastCampaignRepository.findFirstByStatusOrderByCreatedAtAsc(BroadcastCampaignStatus.PROCESSING);
+                broadcastCampaignRepository.findFirstByStatusInOrderByCreatedAtAsc(ACTIVE_CAMPAIGN_STATUSES);
         if (activeCampaign.isPresent()) {
             log.info(
                     "Broadcast campaign skipped: activeCampaignId={} newSource={} sourceChatId={} sourceMessageId={}",
@@ -154,55 +159,117 @@ public class BroadcastService {
         campaign.setSource(source);
         campaign.setSourceChatId(sourceChatId);
         campaign.setSourceMessageId(sourceMessageId);
+        campaign.setMessageText(messageText);
+        campaign.setMessageEntities(messageEntities);
         campaign.setAdminTgId(adminTgId);
-        campaign.setStatus(BroadcastCampaignStatus.PROCESSING);
+        campaign.setStatus(BroadcastCampaignStatus.PREPARING);
         campaign.setTotalRecipients(0);
 
         campaign = broadcastCampaignRepository.saveAndFlush(campaign);
-        int recipients = broadcastRecipientRepository.insertRecipientsForCampaign(campaign.getId());
-        campaign.setTotalRecipients(recipients);
-        campaign = broadcastCampaignRepository.save(campaign);
+        scheduleRecipientPreparation(campaign.getId());
 
         log.info(
-                "Broadcast campaign created: campaignId={}, source={}, sourceChatId={}, sourceMessageId={}, recipients={}",
+                "Broadcast campaign created: campaignId={}, source={}, sourceChatId={}, sourceMessageId={}, status={}",
                 campaign.getId(),
                 campaign.getSource(),
                 campaign.getSourceChatId(),
                 campaign.getSourceMessageId(),
-                campaign.getTotalRecipients()
+                campaign.getStatus()
         );
 
         return BroadcastCreateResult.created(campaign);
     }
 
-    private BroadcastStats completeCampaign(BroadcastCampaign campaign) {
-        long sentCount = broadcastRecipientRepository.countByCampaignIdAndStatus(
-                campaign.getId(),
-                BroadcastRecipientStatus.SENT
-        );
-        long failedCount = broadcastRecipientRepository.countByCampaignIdAndStatus(
-                campaign.getId(),
-                BroadcastRecipientStatus.FAILED
-        );
+    private String serializeEntities(List<MessageEntity> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return null;
+        }
 
-        campaign.setStatus(BroadcastCampaignStatus.COMPLETED);
-        campaign.setCompletedAt(LocalDateTime.now());
-        broadcastCampaignRepository.save(campaign);
+        try {
+            return objectMapper.writeValueAsString(entities);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize broadcast message entities", e);
+            return null;
+        }
+    }
+
+    private void scheduleRecipientPreparation(Long campaignId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            recipientPreparationExecutor.submit(() -> prepareRecipients(campaignId));
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                recipientPreparationExecutor.submit(() -> prepareRecipients(campaignId));
+            }
+        });
+    }
+
+    private void prepareRecipients(Long campaignId) {
+        try {
+            Integer recipients = transactionTemplate.execute(status -> {
+                BroadcastCampaign campaign = broadcastCampaignRepository.findById(campaignId)
+                        .orElseThrow(() -> new IllegalStateException("Broadcast campaign not found: " + campaignId));
+
+                int insertedRecipients = broadcastRecipientRepository.insertRecipientsForCampaign(campaignId);
+                campaign.setTotalRecipients(insertedRecipients);
+                campaign.setStatus(BroadcastCampaignStatus.PROCESSING);
+                broadcastCampaignRepository.save(campaign);
+                return insertedRecipients;
+            });
+
+            log.info(
+                    "Broadcast recipients prepared: campaignId={}, recipients={}",
+                    campaignId,
+                    recipients
+            );
+        } catch (Exception e) {
+            log.error("Broadcast recipients preparation failed: campaignId={}", campaignId, e);
+            markCampaignPreparationFailed(campaignId);
+        }
+    }
+
+    private void markCampaignPreparationFailed(Long campaignId) {
+        transactionTemplate.executeWithoutResult(status ->
+                broadcastCampaignRepository.findById(campaignId).ifPresent(campaign -> {
+                    campaign.setStatus(BroadcastCampaignStatus.FAILED);
+                    campaign.setCompletedAt(LocalDateTime.now());
+                    broadcastCampaignRepository.save(campaign);
+                })
+        );
+    }
+
+    private BroadcastStats toBroadcastStats(BroadcastStatsProjection projection) {
+        BroadcastStats stats = new BroadcastStats(
+                projection.getCampaignId(),
+                BroadcastCampaignSource.valueOf(projection.getSource()),
+                projection.getTotalRecipients(),
+                projection.getSentCount(),
+                projection.getFailedCount()
+        );
 
         log.info(
                 "Broadcast campaign completed: campaignId={}, total={}, sent={}, failed={}",
-                campaign.getId(),
-                campaign.getTotalRecipients(),
-                sentCount,
-                failedCount
+                stats.campaignId(),
+                stats.totalRecipients(),
+                stats.sentCount(),
+                stats.failedCount()
         );
 
-        return new BroadcastStats(
-                campaign.getId(),
-                campaign.getSource(),
-                campaign.getTotalRecipients(),
-                sentCount,
-                failedCount
+        return stats;
+    }
+
+    private BroadcastProgress toBroadcastProgress(BroadcastProgressProjection projection) {
+        return new BroadcastProgress(
+                projection.getCampaignId(),
+                BroadcastCampaignSource.valueOf(projection.getSource()),
+                BroadcastCampaignStatus.valueOf(projection.getStatus()),
+                projection.getTotalRecipients(),
+                projection.getSentCount(),
+                projection.getFailedCount(),
+                projection.getPendingCount()
         );
     }
 
@@ -213,41 +280,9 @@ public class BroadcastService {
         return errorMessage.length() > 512 ? errorMessage.substring(0, 512) : errorMessage;
     }
 
-    public record BroadcastStats(
-            Long campaignId,
-            BroadcastCampaignSource source,
-            Integer totalRecipients,
-            Long sentCount,
-            Long failedCount
-    ) {
+    @PreDestroy
+    public void shutdownRecipientPreparationExecutor() {
+        recipientPreparationExecutor.shutdownNow();
     }
 
-    public enum BroadcastCreateStatus {
-        CREATED,
-        ACTIVE_EXISTS,
-        DUPLICATE,
-        IGNORED
-    }
-
-    public record BroadcastCreateResult(
-            BroadcastCreateStatus status,
-            BroadcastCampaign campaign,
-            BroadcastCampaign activeCampaign
-    ) {
-        public static BroadcastCreateResult created(BroadcastCampaign campaign) {
-            return new BroadcastCreateResult(BroadcastCreateStatus.CREATED, campaign, null);
-        }
-
-        public static BroadcastCreateResult activeExists(BroadcastCampaign activeCampaign) {
-            return new BroadcastCreateResult(BroadcastCreateStatus.ACTIVE_EXISTS, null, activeCampaign);
-        }
-
-        public static BroadcastCreateResult duplicate(BroadcastCampaign campaign) {
-            return new BroadcastCreateResult(BroadcastCreateStatus.DUPLICATE, campaign, null);
-        }
-
-        public static BroadcastCreateResult ignored() {
-            return new BroadcastCreateResult(BroadcastCreateStatus.IGNORED, null, null);
-        }
-    }
 }

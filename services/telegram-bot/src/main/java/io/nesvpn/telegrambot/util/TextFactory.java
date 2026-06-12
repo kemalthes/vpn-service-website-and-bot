@@ -2,19 +2,21 @@ package io.nesvpn.telegrambot.util;
 
 import io.nesvpn.telegrambot.dto.CryptoPayment;
 import io.nesvpn.telegrambot.dto.HwidDevice;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastProgress;
+import io.nesvpn.telegrambot.dto.broadcast.BroadcastStats;
+import io.nesvpn.telegrambot.enums.BroadcastCampaignStatus;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.enums.SubscriptionExpirationNotificationType;
 import io.nesvpn.telegrambot.model.BalanceTransaction;
 import io.nesvpn.telegrambot.model.Payment;
 import io.nesvpn.telegrambot.model.User;
-import io.nesvpn.telegrambot.enums.BroadcastCampaignSource;
-import io.nesvpn.telegrambot.services.BroadcastService.BroadcastStats;
 import io.nesvpn.telegrambot.services.TonPaymentService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -558,14 +560,6 @@ public class TextFactory {
             """, TEXT_ALERT);
     }
 
-    public String channelSubscribeText() {
-        return  """
-            %s <b>Рекомендуем подписаться на канал</b>
-            
-            <i>%s Чтобы быть в курсе всех новостей и анонсов, просим подписаться</i>
-            """.formatted(TEXT_DEVICE, TEXT_BULB);
-    }
-
     public String awaitingBalanceCryptoText(Double rubRate) {
         String formattedRate = String.format("%.2f", rubRate);
 
@@ -949,25 +943,58 @@ public class TextFactory {
             """.formatted(TEXT_CHECK, totalRecipients != null ? totalRecipients : 0);
     }
 
-    public String broadcastCreatedText(Long campaignId, BroadcastCampaignSource source, Integer totalRecipients) {
-        String sourceText = switch (source) {
-            case CHANNEL -> "канал";
-            case ADMIN -> "ручная рассылка";
-        };
+    public String broadcastCreatedText(Long campaignId, Integer totalRecipients) {
+        String recipientsText = totalRecipients != null && totalRecipients > 0
+                ? "<b>%d</b>".formatted(totalRecipients)
+                : "<b>подготавливаются</b>";
 
         return """
             %s <b>Рассылка поставлена в очередь</b>
 
             Кампания: <code>%d</code>
-            Источник: <b>%s</b>
-            Получателей: <b>%d</b>
+            Получателей: %s
 
             Бот начнёт отправку автоматически и пришлёт итоговую статистику после завершения.
             """.formatted(
                 TEXT_NOTE,
                 campaignId,
-                sourceText,
-                totalRecipients != null ? totalRecipients : 0
+                recipientsText
+        );
+    }
+
+    public String broadcastProgressText(BroadcastProgress progress) {
+        String statusText = broadcastStatusText(progress.status());
+        int totalRecipients = progress.totalRecipients() != null ? progress.totalRecipients() : 0;
+        long sentCount = progress.sentCount() != null ? progress.sentCount() : 0L;
+        long failedCount = progress.failedCount() != null ? progress.failedCount() : 0L;
+        long pendingCount = progress.pendingCount() != null ? progress.pendingCount() : 0L;
+        long attemptedCount = sentCount + failedCount;
+        String recipientsText = totalRecipients > 0 ? "<b>%d</b>".formatted(totalRecipients) : "<b>подготавливаются</b>";
+        String updatedAt = Formatter.formatMoscow(LocalDateTime.now(), "HH:mm:ss");
+
+        return """
+            %s <b>Рассылка поставлена в очередь</b>
+
+            Кампания: <code>%d</code>
+            Статус: <b>%s</b>
+
+            Получателей: %s
+            Попытались отправить: <b>%d</b>
+            Успешно: <b>%d</b>
+            С ошибкой: <b>%d</b>
+            Осталось в очереди: <b>%d</b>
+
+            Обновлено: <code>%s</code>
+            """.formatted(
+                TEXT_NOTE,
+                progress.campaignId(),
+                statusText,
+                recipientsText,
+                attemptedCount,
+                sentCount,
+                failedCount,
+                pendingCount,
+                updatedAt
         );
     }
 
@@ -983,16 +1010,10 @@ public class TextFactory {
     }
 
     public String broadcastStatsText(BroadcastStats stats) {
-        String source = switch (stats.source()) {
-            case CHANNEL -> "канал";
-            case ADMIN -> "ручная рассылка";
-        };
-
         return """
             %s <b>Рассылка завершена</b>
 
             Кампания: <code>%d</code>
-            Источник: <b>%s</b>
 
             Всего пользователей: <b>%d</b>
             Успешно отправлено: <b>%d</b>
@@ -1000,10 +1021,18 @@ public class TextFactory {
             """.formatted(
                 TEXT_CHART,
                 stats.campaignId(),
-                source,
                 stats.totalRecipients() != null ? stats.totalRecipients() : 0,
                 stats.sentCount(),
                 stats.failedCount()
         );
+    }
+
+    private String broadcastStatusText(BroadcastCampaignStatus status) {
+        return switch (status) {
+            case PREPARING -> "подготовка получателей";
+            case PROCESSING -> "идёт отправка";
+            case COMPLETED -> "завершена";
+            case FAILED -> "ошибка";
+        };
     }
 }
