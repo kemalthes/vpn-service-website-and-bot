@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 30-align-subscription-expiration-token-valid-to-type
+      author: bulat
+      changes:
+        - dropUniqueConstraint:
+            tableName: subscription_expiration_notifications
+            constraintName: uq_subscription_expiration_notifications_token_type_valid_to
+
+        - modifyDataType:
+            tableName: subscription_expiration_notifications
+            columnName: token_valid_to
+            newDataType: TIMESTAMP
+
+        - addUniqueConstraint:
+            tableName: subscription_expiration_notifications
+            columnNames: token_id, notification_type, token_valid_to
+            constraintName: uq_subscription_expiration_notifications_token_type_valid_to

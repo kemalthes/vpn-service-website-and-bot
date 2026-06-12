@@ -48,3 +48,30 @@ databaseChangeLog:
   - include:
       file: ddl/20260305-add-indexes-for-scheduled.yml
       relativeToChangelogFile: true
+  - include:
+      file: ddl/20260611-create-lucky-777-spins.yml
+      relativeToChangelogFile: true
+  - include:
+      file: dml/20260611-insert-lucky-777-plans.yml
+      relativeToChangelogFile: true
+  - include:
+      file: dml/20260612-rename-lucky-777-one-day-plan.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-add-lucky-777-available-notification.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-create-subscription-expiration-notifications.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-update-subscription-expiration-notifications-token-valid-to.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-align-subscription-expiration-token-valid-to-type.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-unique-subscription-expiration-notification-token.yml
+      relativeToChangelogFile: true
+  - include:
+      file: ddl/20260612-create-broadcast-tables.yml
+      relativeToChangelogFile: true

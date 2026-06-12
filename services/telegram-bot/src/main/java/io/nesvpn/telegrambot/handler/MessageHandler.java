@@ -7,20 +7,28 @@ import io.nesvpn.telegrambot.dto.PlategaCreateResponse;
 import io.nesvpn.telegrambot.enums.BotState;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
 import io.nesvpn.telegrambot.enums.PaymentStatus;
+import io.nesvpn.telegrambot.enums.SubscriptionExpirationNotificationType;
 import io.nesvpn.telegrambot.model.*;
 import io.nesvpn.telegrambot.services.*;
+import io.nesvpn.telegrambot.services.BroadcastService.BroadcastCreateResult;
+import io.nesvpn.telegrambot.services.BroadcastService.BroadcastStats;
 import io.nesvpn.telegrambot.services.ReferralService;
 import io.nesvpn.telegrambot.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.methods.CopyMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageCaption;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Message;
+import org.telegram.telegrambots.meta.api.objects.MessageId;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.meta.exceptions.TelegramApiRequestException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -58,6 +66,8 @@ public class MessageHandler {
     private final PlategaService plategaService;
     private final TextFactory textFactory;
     private final FreeSubscriptionAwaitService freeSubscriptionAwaitService;
+    private final Lucky777Service lucky777Service;
+    private final BroadcastService broadcastService;
 
     public MessageHandler(
             UserService userService,
@@ -75,7 +85,9 @@ public class MessageHandler {
             CooldownService cooldownService,
             PlategaService plategaService,
             TextFactory textFactory,
-            FreeSubscriptionAwaitService freeSubscriptionAwaitService) {
+            FreeSubscriptionAwaitService freeSubscriptionAwaitService,
+            Lucky777Service lucky777Service,
+            BroadcastService broadcastService) {
         this.userService = userService;
         this.telegramUserService = telegramUserService;
         this.referralService = referralService;
@@ -92,26 +104,38 @@ public class MessageHandler {
         this.plategaService = plategaService;
         this.textFactory = textFactory;
         this.freeSubscriptionAwaitService = freeSubscriptionAwaitService;
+        this.lucky777Service = lucky777Service;
+        this.broadcastService = broadcastService;
     }
 
     public void handle(Message message) {
         String text = message.getText();
-        if (text.startsWith("/start")) {
+        if (message.getFrom() == null) {
+            return;
+        }
+
+        Long fromId = message.getFrom().getId();
+        TelegramUser currentTelegramUser = telegramUserService.findOrCreate(fromId);
+        if (isNavigationCommand(text)) {
+            removeReplyKeyboard(message.getChatId());
+        }
+
+        if (text != null && text.startsWith("/start")) {
             handleStart(message);
-        } else if (text.equals("/profile")) {
+        } else if ("/profile".equals(text)) {
             handleProfile(message);
-        } else if (text.equals("/referrals")) {
+        } else if ("/referrals".equals(text)) {
             handleReferrals(message);
-        } else if (text.equals("/instructions")) {
+        } else if ("/instructions".equals(text)) {
             handleInstructions(message);
-        } else if (text.equals("/balance")) {
+        } else if ("/balance".equals(text)) {
             handleBalance(message);
-        } else if (text.equals("/subscriptions")) {
+        } else if ("/subscriptions".equals(text)) {
             hanldeSubscription(message);
-        } else if (text.equals("/info")) {
+        } else if ("/info".equals(text)) {
             handleAboutService(message);
         } else {
-            TelegramUser telegramUser = telegramUserService.findOrCreate(message.getFrom().getId());
+            TelegramUser telegramUser = currentTelegramUser;
 
             if (telegramUser == null) {
                 deleteMessage(message.getChatId(), message.getMessageId());
@@ -119,12 +143,116 @@ public class MessageHandler {
                 return;
             } 
             
-            if (telegramUser.getState().equals(BotState.BALANCE_AWAITING_AMOUNT.toString())) {
+            BotState state = BotState.fromString(telegramUser.getState());
+
+            if (isBroadcastAwaitingPostState(state) && broadcastService.isAdmin(fromId)) {
+                handleAdminBroadcastPost(message);
+            } else if (text == null) {
+                deleteMessage(message.getChatId(), message.getMessageId());
+            } else if (isLucky777BackText(state, text)) {
+                removeReplyKeyboard(message.getChatId());
+                deleteMessage(message.getChatId(), message.getMessageId());
+                User user = userService.findOrCreateByTgId(message.getFrom().getId());
+                showSubscription(message.getChatId(), null, user);
+            } else if (isLucky777SpinText(state, text)) {
+                sendMessage(message.getChatId(), textFactory.lucky777KeyboardButtonText(), keyboardFactory.getBackButton(), "HTML");
+            } else if (isLucky777State(state)) {
+                sendMessage(message.getChatId(), textFactory.lucky777InvalidDiceText(), keyboardFactory.getBackButton(), "HTML");
+            } else if (telegramUser.getState().equals(BotState.BALANCE_AWAITING_AMOUNT.toString())) {
                 handleAmountInput(message);
             } else if (telegramUser.getState().equals(BotState.BALANCE_AWAITING_AMOUNT_CRYPTO.toString())) {
                 handleAmountInputCrypto(message);
             } else {
                 deleteMessage(message.getChatId(), message.getMessageId());
+            }
+        }
+    }
+
+    public void handleDice(Message message) {
+        Long userId = message.getFrom().getId();
+        Long chatId = message.getChatId();
+        User user = userService.findOrCreateByTgId(userId);
+        TelegramUser telegramUser = telegramUserService.findOrCreate(userId);
+        BotState state = BotState.fromString(telegramUser.getState());
+
+        if (!isLucky777State(state)) {
+            return;
+        }
+
+        Token token = tokenService.getUserToken(user.getId());
+        if (token == null) {
+            sendMessage(chatId, textFactory.lucky777NoTokenText(), keyboardFactory.getBackButton(), "HTML");
+            return;
+        }
+
+        if (message.getDice() == null || !lucky777Service.isSlotDice(message.getDice().getEmoji())) {
+            sendMessage(chatId, textFactory.lucky777InvalidDiceText(), keyboardFactory.getBackButton(), "HTML");
+            return;
+        }
+
+        if (isForwardedMessage(message)) {
+            sendMessage(chatId, textFactory.lucky777ForwardedDiceText(), keyboardFactory.getBackButton(), "HTML");
+            return;
+        }
+
+        try {
+            Lucky777Service.Lucky777Result result = lucky777Service.processDice(user, message.getDice().getValue());
+            telegramUserService.updateState(userId, BotState.SUBSCRIPTION_LUCKY_777, BotState.SUBSCRIPTIONS);
+
+            if (result.noToken()) {
+                sendMessage(chatId, textFactory.lucky777NoTokenText(), keyboardFactory.getBackButton(), "HTML");
+            } else if (!result.processed()) {
+                sendMessage(chatId, textFactory.lucky777CooldownText(formatRemaining(result.remaining())), keyboardFactory.getBackButton(), "HTML");
+            } else {
+                sendMessage(chatId, textFactory.lucky777ResultText(result.diceValue(), result.rewardDays()), keyboardFactory.getBackButton(), "HTML");
+            }
+        } catch (Exception e) {
+            log.error("Lucky 777 dice handling error", e);
+            sendMessage(chatId, textFactory.dataNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+        }
+    }
+
+    public void handleChannelPost(Message message) {
+        try {
+            BroadcastCreateResult result = broadcastService.createFromChannelPost(message);
+            handleBroadcastCreateResult(result, null);
+        } catch (Exception e) {
+            log.error("Failed to create broadcast from channel post", e);
+        }
+    }
+
+    private void handleAdminBroadcastPost(Message message) {
+        Long tgId = message.getFrom().getId();
+
+        try {
+            BroadcastCreateResult result = broadcastService.createFromAdminPost(message);
+            telegramUserService.setState(tgId, BotState.START);
+            handleBroadcastCreateResult(result, message.getChatId());
+
+            User user = userService.findOrCreateByTgId(tgId);
+            showStart(message.getChatId(), null, user);
+        } catch (Exception e) {
+            log.error("Failed to create broadcast from admin post", e);
+            sendMessage(message.getChatId(), textFactory.dataNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+        }
+    }
+
+    private void handleBroadcastCreateResult(BroadcastCreateResult result, Long adminChatId) {
+        switch (result.status()) {
+            case CREATED -> showBroadcastCreatedToAdmins(result.campaign());
+            case ACTIVE_EXISTS -> {
+                Long activeCampaignId = result.activeCampaign() != null ? result.activeCampaign().getId() : null;
+                String text = textFactory.broadcastAlreadyRunningText(activeCampaignId);
+                if (adminChatId != null) {
+                    sendMessage(adminChatId, text, null, "HTML");
+                } else {
+                    showBroadcastTextToAdmins(text);
+                }
+            }
+            case DUPLICATE, IGNORED -> {
+                if (adminChatId != null) {
+                    sendMessage(adminChatId, textFactory.dataNotFoundText(), keyboardFactory.getBackButton(), "HTML");
+                }
             }
         }
     }
@@ -232,22 +360,14 @@ public class MessageHandler {
             int amount = Integer.parseInt(message.getText().trim().replaceAll("[^0-9]", ""));
 
             if (amount < 100) {
-                sendError(chatId, """
-                    ❌ Минимальная сумма пополнения — *100₽*
-                    
-                    Введите другую сумму:
-                    """);
+                sendError(chatId, textFactory.inputErrorText("Минимальная сумма пополнения — 100₽", "Введите другую сумму:"));
 
                 showAwaitingBalance(chatId, null, user);
                 return;
             }
 
             if (amount > 2000) {
-                sendError(chatId, """
-                    ❌ Максимальная сумма пополнения — *2000₽*
-                    
-                    Введите другую сумму:
-                    """);
+                sendError(chatId, textFactory.inputErrorText("Максимальная сумма пополнения — 2000₽", "Введите другую сумму:"));
 
                 showAwaitingBalance(chatId, null, user);
                 return;
@@ -255,11 +375,7 @@ public class MessageHandler {
 
             showPaymentSbp(chatId, amount, user);
         } catch (NumberFormatException e) {
-            sendError(chatId, """
-                ❌ Неверный формат суммы
-                
-                Введите число от *100* до *2000*:"
-                """);
+            sendError(chatId, textFactory.inputErrorText("Неверный формат суммы", "Введите число от <b>100</b> до <b>2000</b>:"));
 
             showAwaitingBalance(chatId, null, user);
         }
@@ -273,22 +389,14 @@ public class MessageHandler {
         try {
             double amount = Double.parseDouble(message.getText().trim().replaceAll("[^0-9,.]", ""));
             if (amount < 1) {
-                sendError(chatId, """
-                    ❌ Минимальная сумма пополнения — *1$*
-                    
-                    Введите другую сумму (1 - 25$):
-                    """);
+                sendError(chatId, textFactory.inputErrorText("Минимальная сумма пополнения — 1$", "Введите другую сумму (1 - 25$):"));
 
                 showAwaitingBalanceWithCrypto(chatId, null, user);
                 return;
             }
 
             if (amount > 25) {
-                sendError(chatId, """
-                    ❌ Максимальная сумма пополнения — *25$*
-                    
-                    Введите другую сумму:
-                    """);
+                sendError(chatId, textFactory.inputErrorText("Максимальная сумма пополнения — 25$", "Введите другую сумму:"));
 
                 showAwaitingBalanceWithCrypto(chatId, null, user);
                 return;
@@ -296,11 +404,7 @@ public class MessageHandler {
 
             showPaymentWithCrypto(chatId, amount, user);
         } catch (NumberFormatException e) {
-            sendError(chatId, """
-                ❌ Неверный формат суммы
-                
-                Введите число от *1$* до *25$*:"
-                """);
+            sendError(chatId, textFactory.inputErrorText("Неверный формат суммы", "Введите число от <b>1$</b> до <b>25$</b>:"));
 
             showAwaitingBalanceWithCrypto(chatId, null, user);
         }
@@ -309,7 +413,7 @@ public class MessageHandler {
     public void showTopUp(Long chatId, Integer messageId) {
         telegramUserService.updateState(chatId, BotState.BALANCE_TOP_UP, BotState.BALANCE);
 
-        editOrSendMessage(chatId, messageId, textFactory.topUpText(), keyboardFactory.getTopUpMenuInline(), "Markdown");
+        editOrSendMessage(chatId, messageId, textFactory.topUpText(), keyboardFactory.getTopUpMenuInline(), "HTML");
     }
 
     public void showAboutService(Long chatId, Integer messageId) {
@@ -419,7 +523,7 @@ public class MessageHandler {
             }
         } catch (Exception e) {
             log.error("Show payment with SBP", e);
-            sendMessage(chatId, textFactory.errorPlategaText(), keyboardFactory.getBackButton(), "Markdown");
+            sendMessage(chatId, textFactory.errorPlategaText(), keyboardFactory.getBackButton(), "HTML");
             return;
         }
 
@@ -525,7 +629,34 @@ public class MessageHandler {
 
         String displayName = DisplayTelegramUsername.getDisplayName(vpnBot, user.getTgId());
 
-        editOrSendMessage(chatId, messageId, textFactory.startText(displayName), keyboardFactory.getMainMenuInline(), "HTML");
+        editOrSendMessage(
+                chatId,
+                messageId,
+                textFactory.startText(displayName),
+                keyboardFactory.getMainMenuInline(broadcastService.isAdmin(user.getTgId())),
+                "HTML"
+        );
+    }
+
+    public void showBroadcast(Long chatId, Integer messageId, User user) {
+        if (!broadcastService.isAdmin(user.getTgId())) {
+            showStart(chatId, messageId, user);
+            return;
+        }
+
+        telegramUserService.updateState(user.getTgId(), BotState.BROADCAST_AWAITING_POST, BotState.START);
+        editOrSendMessage(
+                chatId,
+                messageId,
+                textFactory.broadcastAwaitingPostText(),
+                keyboardFactory.getBroadcastAwaitingPostKeyboard(),
+                "HTML"
+        );
+    }
+
+    public void showBroadcastHome(Long chatId, Integer messageId, User user) {
+        removeInlineKeyboard(chatId, messageId);
+        showStart(chatId, null, user);
     }
 
     public void showProfile(Long chatId, Integer messageId, User user) {
@@ -587,32 +718,32 @@ public class MessageHandler {
         Long userId = user.getTgId();
         telegramUserService.updateState(userId, BotState.INSTRUCTIONS, BotState.SUBSCRIPTIONS);
 
-        editOrSendMessage(chatId, messageId, textFactory.instructionsText(), keyboardFactory.getInstructionsMenu(), "Markdown");
+        editOrSendMessage(chatId, messageId, textFactory.instructionsText(), keyboardFactory.getInstructionsMenu(), "HTML");
     }
 
     public void showAndroidInstructions(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_ANDROID, BotState.INSTRUCTIONS);
-        editMessage(chatId, messageId, textFactory.androidInstructionText(), keyboardFactory.getBackButton(), "Markdown");
+        editMessage(chatId, messageId, textFactory.androidInstructionText(), keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showIosInstructions(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_IOS, BotState.INSTRUCTIONS);
-        editMessage(chatId, messageId, textFactory.iosInstructionText(), keyboardFactory.getBackButton(), "Markdown");
+        editMessage(chatId, messageId, textFactory.iosInstructionText(), keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showWindowsInstructions(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_WINDOWS, BotState.INSTRUCTIONS);
-        editMessage(chatId, messageId, textFactory.windowsInstructionText(), keyboardFactory.getBackButton(), "Markdown");
+        editMessage(chatId, messageId, textFactory.windowsInstructionText(), keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showMacosInstructions(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.INSTRUCTIONS_MACOS, BotState.INSTRUCTIONS);
-        editMessage(chatId, messageId, textFactory.macosInstructionText(), keyboardFactory.getBackButton(), "Markdown");
+        editMessage(chatId, messageId, textFactory.macosInstructionText(), keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showBalance(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.BALANCE, BotState.START);
-        editOrSendMessage(chatId, messageId, textFactory.balanceText(user.getBalance()), keyboardFactory.getBalanceMenu(), "Markdown");
+        editOrSendMessage(chatId, messageId, textFactory.balanceText(user.getBalance()), keyboardFactory.getBalanceMenu(), "HTML");
     }
 
     public void showBalanceHistory(Long chatId, Integer messageId, User user) {
@@ -625,13 +756,13 @@ public class MessageHandler {
     public void showAwaitingBalance(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT, BotState.BALANCE_TOP_UP);
 
-        editOrSendMessage(chatId, messageId, textFactory.awaitingBalanceRubText(), keyboardFactory.getBackButton(), "Markdown");
+        editOrSendMessage(chatId, messageId, textFactory.awaitingBalanceRubText(), keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showAwaitingBalanceWithCrypto(Long chatId, Integer messageId, User user) {
         telegramUserService.updateState(user.getTgId(), BotState.BALANCE_AWAITING_AMOUNT_CRYPTO, BotState.BALANCE_TOP_UP);
 
-        editOrSendMessage(chatId, messageId, textFactory.awaitingBalanceCryptoText(floatRatesService.getUsdToRubRate()), keyboardFactory.getBackButton(), "Markdown");
+        editOrSendMessage(chatId, messageId, textFactory.awaitingBalanceCryptoText(floatRatesService.getUsdToRubRate()), keyboardFactory.getBackButton(), "HTML");
     }
 
     public void showSubscribeChannel(Long chatId, Integer messageId) {
@@ -653,17 +784,38 @@ public class MessageHandler {
             long daysLeft = tokenService.getDaysLeft(token);
             boolean isActive = token.isActive();
             String tokenUrl = tokenService.getFullTokenUrl(token);
-            List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(user.getId());
-            if (hwidDevices == null) {
-                //TODO написать ошибка запроса
-                return;
+            Integer devicesCount = null;
+            try {
+                List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(user.getId());
+                if (hwidDevices != null) {
+                    devicesCount = hwidDevices.size();
+                } else {
+                    log.warn("Empty HWID devices response for subscription page, userId={}", user.getId());
+                }
+            } catch (Exception ex) {
+                log.error("Failed to get HWID devices for subscription page, userId={}", user.getId(), ex);
             }
-            Integer devicesCount = hwidDevices.size();
             String validTo = token.getValidTo() != null
                     ? Formatter.formatMoscow(token.getValidTo())
                     : "Не указано";
             editOrSendMessage(chatId, messageId, textFactory.subscriptionText(isActive, tokenUrl, validTo, daysLeft, devicesCount), keyboardFactory.getSubscriptionKeyboard(token.isActive(), devicesCount), "HTML");
         }
+    }
+
+    public void showLucky777(Long chatId, Integer messageId, User user) {
+        Token token = tokenService.getUserToken(user.getId());
+        if (token == null) {
+            showSubscription(chatId, messageId, user);
+            return;
+        }
+
+        telegramUserService.updateState(user.getTgId(), BotState.SUBSCRIPTION_LUCKY_777, BotState.SUBSCRIPTIONS);
+        Lucky777Service.Lucky777Status status = lucky777Service.getStatus(user);
+
+        if (messageId != null) {
+            deleteMessage(chatId, messageId);
+        }
+        sendMessage(chatId, textFactory.lucky777Text(status.canSpin(), formatRemaining(status.remaining())), keyboardFactory.getLucky777ReplyKeyboard(), "HTML");
     }
 
     public void showHwidDevices(Long chatId, Integer messageId, User user) {
@@ -677,9 +829,17 @@ public class MessageHandler {
             return;
         }
 
-        List<HwidDevice> hwidDevices = tokenService.getHwidDevicesByToken(user.getId());
+        List<HwidDevice> hwidDevices;
+        try {
+            hwidDevices = tokenService.getHwidDevicesByToken(user.getId());
+        } catch (Exception ex) {
+            log.error("Failed to get HWID devices for userId={}", user.getId(), ex);
+            editOrSendMessage(chatId, messageId, textFactory.hwidDevicesUnavailableText(), keyboardFactory.getBackButton(), "HTML");
+            return;
+        }
         if (hwidDevices == null) {
-            //TODO что-то писать тоже
+            editOrSendMessage(chatId, messageId, textFactory.hwidDevicesUnavailableText(), keyboardFactory.getBackButton(), "HTML");
+            return;
         }
         editOrSendMessage(chatId, messageId, textFactory.hwidDevicesText(hwidDevices), keyboardFactory.getHwidDevicesKeyboard(hwidDevices), "HTML");
     }
@@ -760,8 +920,68 @@ public class MessageHandler {
 
     }
 
-    public void showSubscriptionExpiring(Long chatId, String validTo) {
-        editOrSendMessage(chatId, null, textFactory.subscribeExpiringText(validTo), keyboardFactory.getExpiringSubscriptionMenu(), "HTML");
+    public boolean showSubscriptionExpirationNotification(
+            Long chatId,
+            SubscriptionExpirationNotificationType type,
+            String validTo
+    ) {
+        return tryEditOrSendMessage(
+                chatId,
+                null,
+                textFactory.subscriptionExpirationNotificationText(type, validTo),
+                keyboardFactory.getExpiringSubscriptionMenu(),
+                "HTML"
+        );
+    }
+
+    public boolean showLucky777AvailableNotification(Long chatId) {
+        return trySendMessage(
+                chatId,
+                textFactory.lucky777AvailableNotificationText(),
+                keyboardFactory.getLucky777AvailableNotificationKeyboard(),
+                "HTML"
+        );
+    }
+
+    public BroadcastDeliveryResult copyBroadcastMessage(BroadcastRecipient recipient, BroadcastCampaign campaign) {
+        CopyMessage copyMessage = new CopyMessage();
+        copyMessage.setChatId(recipient.getTgId());
+        copyMessage.setFromChatId(campaign.getSourceChatId());
+        copyMessage.setMessageId(campaign.getSourceMessageId());
+        copyMessage.setReplyMarkup(keyboardFactory.getBroadcastHomeKeyboard());
+
+        try {
+            MessageId sentMessage = vpnBot.execute(copyMessage);
+            return BroadcastDeliveryResult.sent(sentMessage.getMessageId());
+        } catch (TelegramApiException e) {
+            String errorMessage = formatTelegramError(e);
+            log.warn(
+                    "Broadcast send failed: campaignId={}, recipientId={}, tgId={}, error={}",
+                    campaign.getId(),
+                    recipient.getId(),
+                    recipient.getTgId(),
+                    errorMessage
+            );
+            return BroadcastDeliveryResult.failed(errorMessage);
+        }
+    }
+
+    public void showBroadcastStats(BroadcastStats stats) {
+        showBroadcastTextToAdmins(textFactory.broadcastStatsText(stats));
+    }
+
+    private void showBroadcastCreatedToAdmins(BroadcastCampaign campaign) {
+        showBroadcastTextToAdmins(textFactory.broadcastCreatedText(
+                campaign.getId(),
+                campaign.getSource(),
+                campaign.getTotalRecipients()
+        ));
+    }
+
+    private void showBroadcastTextToAdmins(String text) {
+        for (Long adminId : broadcastService.getAdminIds()) {
+            trySendMessage(adminId, text, null, "HTML");
+        }
     }
 
     public void showExtendConfirm(Long chatId, Integer messageId, Long tokenId, Long planId, User user) {
@@ -814,7 +1034,86 @@ public class MessageHandler {
         showStart(chatId, null, user);
     }
 
-    private void sendMessage(Long chatId, String text, InlineKeyboardMarkup markup, String parseMode) {
+    private boolean isLucky777State(BotState state) {
+        return state == BotState.SUBSCRIPTION_LUCKY_777;
+    }
+
+    private boolean isBroadcastAwaitingPostState(BotState state) {
+        return state == BotState.BROADCAST_AWAITING_POST;
+    }
+
+    private boolean isLucky777BackText(BotState state, String text) {
+        return isLucky777State(state) && ("Назад".equals(text) || "◀️ Назад".equals(text));
+    }
+
+    private boolean isLucky777SpinText(BotState state, String text) {
+        return isLucky777State(state) && ("Прокрутить".equals(text) || "🎰".equals(text));
+    }
+
+    private boolean isNavigationCommand(String text) {
+        return text != null && (text.startsWith("/start")
+                || text.equals("/profile")
+                || text.equals("/referrals")
+                || text.equals("/instructions")
+                || text.equals("/balance")
+                || text.equals("/subscriptions")
+                || text.equals("/info"));
+    }
+
+    private boolean isForwardedMessage(Message message) {
+        return message.getForwardOrigin() != null
+                || message.getForwardDate() != null
+                || message.getForwardFrom() != null
+                || message.getForwardFromChat() != null
+                || message.getForwardSenderName() != null
+                || message.getForwardSignature() != null
+                || Boolean.TRUE.equals(message.getIsAutomaticForward());
+    }
+
+    private String formatRemaining(Duration remaining) {
+        if (remaining == null || remaining.isZero() || remaining.isNegative()) {
+            return "0 минут";
+        }
+
+        long hours = remaining.toHours();
+        long minutes = remaining.toMinutesPart();
+
+        if (hours > 0) {
+            return String.format("%d ч %d мин", hours, minutes);
+        }
+
+        return String.format("%d мин", Math.max(1, minutes));
+    }
+
+    public record BroadcastDeliveryResult(boolean success, Long sentMessageId, String errorMessage) {
+        public static BroadcastDeliveryResult sent(Long sentMessageId) {
+            return new BroadcastDeliveryResult(true, sentMessageId, null);
+        }
+
+        public static BroadcastDeliveryResult failed(String errorMessage) {
+            return new BroadcastDeliveryResult(false, null, errorMessage);
+        }
+    }
+
+    public void removeReplyKeyboard(Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText("\u2060");
+        message.setReplyMarkup(keyboardFactory.getRemoveReplyKeyboard());
+
+        try {
+            Message sentMessage = vpnBot.execute(message);
+            deleteMessage(chatId, sentMessage.getMessageId());
+        } catch (TelegramApiException e) {
+            log.error("Failed to remove reply keyboard", e);
+        }
+    }
+
+    private void sendMessage(Long chatId, String text, ReplyKeyboard markup, String parseMode) {
+        trySendMessage(chatId, text, markup, parseMode);
+    }
+
+    private boolean trySendMessage(Long chatId, String text, ReplyKeyboard markup, String parseMode) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(text);
@@ -827,8 +1126,10 @@ public class MessageHandler {
 
         try {
             vpnBot.execute(message);
+            return true;
         } catch (TelegramApiException e) {
             log.error("Telegram API Exception", e);
+            return false;
         }
     }
 
@@ -841,6 +1142,39 @@ public class MessageHandler {
         } catch (TelegramApiException e) {
             log.error("Telegram API Exception", e);
         }
+    }
+
+    private void removeInlineKeyboard(Long chatId, Integer messageId) {
+        if (messageId == null) {
+            return;
+        }
+
+        EditMessageReplyMarkup editMarkup = new EditMessageReplyMarkup();
+        editMarkup.setChatId(chatId);
+        editMarkup.setMessageId(messageId);
+
+        try {
+            vpnBot.execute(editMarkup);
+        } catch (TelegramApiException e) {
+            log.warn(
+                    "Failed to remove inline keyboard: chatId={}, messageId={}, error={}",
+                    chatId,
+                    messageId,
+                    formatTelegramError(e)
+            );
+        }
+    }
+
+    private String formatTelegramError(TelegramApiException e) {
+        if (e instanceof TelegramApiRequestException requestException) {
+            Integer errorCode = requestException.getErrorCode();
+            String apiResponse = requestException.getApiResponse();
+            if (apiResponse != null && !apiResponse.isBlank()) {
+                return "[" + errorCode + "] " + apiResponse;
+            }
+        }
+
+        return e.getMessage();
     }
 
     private void editMessageCaption(Long chatId, Integer messageId, String caption, InlineKeyboardMarkup keyboard) {
@@ -865,7 +1199,7 @@ public class MessageHandler {
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
         message.setText(errorText);
-        message.setParseMode("Markdown");
+        message.setParseMode("HTML");
 
         try {
             vpnBot.execute(message);
@@ -892,6 +1226,10 @@ public class MessageHandler {
     }
 
     private void editOrSendMessage(Long chatId, Integer messageId, String text, InlineKeyboardMarkup markup, String parseMode) {
+        tryEditOrSendMessage(chatId, messageId, text, markup, parseMode);
+    }
+
+    private boolean tryEditOrSendMessage(Long chatId, Integer messageId, String text, InlineKeyboardMarkup markup, String parseMode) {
         try {
             if (messageId != null) {
                 EditMessageText editMessage = new EditMessageText();
@@ -913,8 +1251,10 @@ public class MessageHandler {
                 sendMessage.setParseMode(parseMode);
                 vpnBot.execute(sendMessage);
             }
+            return true;
         } catch (TelegramApiException e) {
             log.error("Telegram API Exception", e);
+            return false;
         }
     }
 }

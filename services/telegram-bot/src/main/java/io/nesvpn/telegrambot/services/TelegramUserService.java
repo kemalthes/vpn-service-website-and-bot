@@ -25,11 +25,6 @@ public class TelegramUserService {
                 .orElseGet(() -> create(tgId, BotState.START));
     }
 
-
-    public boolean existsByTgId(Long tgId) {
-        return telegramUserRepository.existsByTgId(tgId);
-    }
-
     public TelegramUser create(Long tgId, BotState state) {
         TelegramUser telegramUser = new TelegramUser();
         telegramUser.setTgId(tgId);
@@ -43,12 +38,6 @@ public class TelegramUserService {
         telegramUser.setPreviousState(previousState != null ? previousState.toString() : telegramUser.getState());
         telegramUser.setState(newState.toString());
         telegramUserRepository.save(telegramUser);
-    }
-
-    public BotState getCurrentState(Long tgId) {
-        return telegramUserRepository.findByTgId(tgId)
-                .map(tu -> BotState.fromString(tu.getState()))
-                .orElse(BotState.START);
     }
 
     public BotState getPreviousState(Long tgId) {
@@ -70,10 +59,6 @@ public class TelegramUserService {
         }
     }
 
-    public void resetState(Long tgId) {
-        updateState(tgId, BotState.START, null);
-    }
-
     public void setState(Long tgId, BotState state) {
         TelegramUser telegramUser = findOrCreate(tgId);
 
@@ -81,11 +66,5 @@ public class TelegramUserService {
         telegramUser.setState(state.toString());
 
         telegramUserRepository.save(telegramUser);
-    }
-
-
-
-    public TelegramUser save(TelegramUser telegramUser) {
-        return telegramUserRepository.save(telegramUser);
     }
 }

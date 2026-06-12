@@ -1,0 +1,63 @@
+databaseChangeLog:
+  - changeSet:
+      id: 23-add-lucky-777-bonus-plan
+      author: bulat
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM vpn_plans WHERE id = 5 OR name = '777 бонус'
+      changes:
+        - insert:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: id
+                  value: '5'
+              - column:
+                  name: name
+                  value: "777 бонус"
+              - column:
+                  name: price
+                  value: '0'
+              - column:
+                  name: duration
+                  value: '3'
+              - column:
+                  name: country
+                  value: "Bonus"
+
+  - changeSet:
+      id: 24-add-lucky-777-consolation-plan
+      author: bulat
+      preConditions:
+        - onFail: MARK_RAN
+        - sqlCheck:
+            expectedResult: "0"
+            sql: SELECT COUNT(*) FROM vpn_plans WHERE id = 6 OR name = '777 утешительный'
+      changes:
+        - insert:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: id
+                  value: '6'
+              - column:
+                  name: name
+                  value: "777 утешительный"
+              - column:
+                  name: price
+                  value: '0'
+              - column:
+                  name: duration
+                  value: '1'
+              - column:
+                  name: country
+                  value: "Bonus"
+
+  - changeSet:
+      id: 25-sync-vpn-plans-sequence-after-lucky-777
+      author: bulat
+      changes:
+        - sql:
+            sql: SELECT setval(pg_get_serial_sequence('vpn_plans', 'id'), (SELECT MAX(id) FROM vpn_plans));

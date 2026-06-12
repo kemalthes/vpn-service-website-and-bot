@@ -1,0 +1,164 @@
+databaseChangeLog:
+  - changeSet:
+      id: 32-create-broadcast-tables
+      author: bulat
+      changes:
+        - createTable:
+            tableName: broadcast_campaigns
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: source
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_chat_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_message_id
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: admin_tg_id
+                  type: BIGINT
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_recipients
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completed_at
+                  type: TIMESTAMPTZ
+
+        - addUniqueConstraint:
+            tableName: broadcast_campaigns
+            columnNames: source_chat_id, source_message_id
+            constraintName: uq_broadcast_campaign_source_message
+
+        - sql:
+            sql: |
+              ALTER TABLE broadcast_campaigns
+              ADD CONSTRAINT ch_broadcast_campaign_source
+              CHECK (source IN ('CHANNEL', 'ADMIN'));
+
+        - sql:
+            sql: |
+              ALTER TABLE broadcast_campaigns
+              ADD CONSTRAINT ch_broadcast_campaign_status
+              CHECK (status IN ('PROCESSING', 'COMPLETED'));
+
+        - createTable:
+            tableName: broadcast_recipients
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: campaign_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tg_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sent_message_id
+                  type: BIGINT
+              - column:
+                  name: error_message
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sent_at
+                  type: TIMESTAMPTZ
+              - column:
+                  name: updated_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: broadcast_recipients
+            baseColumnNames: campaign_id
+            constraintName: fk_broadcast_recipients_campaign
+            referencedTableName: broadcast_campaigns
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - addForeignKeyConstraint:
+            baseTableName: broadcast_recipients
+            baseColumnNames: user_id
+            constraintName: fk_broadcast_recipients_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - addUniqueConstraint:
+            tableName: broadcast_recipients
+            columnNames: campaign_id, tg_id
+            constraintName: uq_broadcast_recipients_campaign_tg
+
+        - sql:
+            sql: |
+              ALTER TABLE broadcast_recipients
+              ADD CONSTRAINT ch_broadcast_recipient_status
+              CHECK (status IN ('PENDING', 'SENT', 'FAILED'));
+
+        - sql:
+            sql: |
+              CREATE INDEX idx_broadcast_recipients_pending
+              ON broadcast_recipients (id)
+              WHERE status = 'PENDING';
+
+        - sql:
+            sql: |
+              CREATE INDEX idx_broadcast_recipients_campaign_status
+              ON broadcast_recipients (campaign_id, status);
+
+        - sql:
+            sql: |
+              CREATE INDEX idx_broadcast_campaigns_processing
+              ON broadcast_campaigns (created_at)
+              WHERE status = 'PROCESSING';

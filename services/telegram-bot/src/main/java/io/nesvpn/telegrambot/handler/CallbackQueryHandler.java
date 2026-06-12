@@ -40,6 +40,11 @@ public class CallbackQueryHandler {
 
         answerCallback(callbackQuery.getId(), null);
 
+        BotState currentState = BotState.fromString(telegramUserService.findOrCreate(tgId).getState());
+        if (currentState == BotState.SUBSCRIPTION_LUCKY_777 && !data.equals("subscription_lucky_777")) {
+            messageHandler.removeReplyKeyboard(chatId);
+        }
+
         User user = userService.findOrCreateByTgId(tgId);
 
         switch (data) {
@@ -60,7 +65,10 @@ public class CallbackQueryHandler {
             case "subscription" -> messageHandler.showSubscription(chatId, messageId, user);
             case "subscription_devices" -> messageHandler.showHwidDevices(chatId, messageId, user);
             case "subscription_extend" -> messageHandler.showSubscriptionExtend(chatId, messageId, user);
+            case "subscription_lucky_777" -> messageHandler.showLucky777(chatId, messageId, user);
             case "info" -> messageHandler.showAboutService(chatId, messageId);
+            case "broadcast" -> messageHandler.showBroadcast(chatId, messageId, user);
+            case "broadcast_home" -> messageHandler.showBroadcastHome(chatId, messageId, user);
         }
 
         if (data.startsWith("check_payment_sbp")) {
@@ -129,6 +137,9 @@ public class CallbackQueryHandler {
                 break;
             case SUBSCRIPTIONS_EXTEND:
                 messageHandler.showSubscriptionExtend(chatId, messageId, user);
+                break;
+            case SUBSCRIPTION_LUCKY_777:
+                messageHandler.showLucky777(chatId, messageId, user);
                 break;
             case START:
             default:

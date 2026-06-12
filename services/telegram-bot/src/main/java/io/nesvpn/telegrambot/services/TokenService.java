@@ -73,10 +73,6 @@ public class TokenService {
         return response.isSuccess();
     }
 
-    public List<Token> getExpiringTokens(LocalDateTime now, LocalDateTime twoDaysLater) {
-        return tokenRepository.findExpiringTokens(now, twoDaysLater);
-    }
-
     public Optional<Token> findById(Long id) {
         return tokenRepository.findById(id);
     }

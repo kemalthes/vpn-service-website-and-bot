@@ -1,0 +1,86 @@
+databaseChangeLog:
+  - changeSet:
+      id: 22-create-lucky-777-spins
+      author: bulat
+      changes:
+        - createTable:
+            tableName: lucky_777_spins
+            columns:
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: last_spin_at
+                  type: TIMESTAMPTZ
+              - column:
+                  name: last_dice_value
+                  type: INTEGER
+              - column:
+                  name: last_reward_days
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_result
+                  type: VARCHAR(32)
+              - column:
+                  name: total_spins
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_wins
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: lucky_777_spins
+            baseColumnNames: user_id
+            constraintName: fk_lucky_777_spins_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - sql:
+            sql: |
+              ALTER TABLE lucky_777_spins
+              ADD CONSTRAINT ch_lucky_777_dice_value
+              CHECK (last_dice_value IS NULL OR last_dice_value BETWEEN 1 AND 64);
+
+        - sql:
+            sql: |
+              ALTER TABLE lucky_777_spins
+              ADD CONSTRAINT ch_lucky_777_reward_days
+              CHECK (last_reward_days IN (0, 1, 3));
+
+        - sql:
+            sql: |
+              ALTER TABLE lucky_777_spins
+              ADD CONSTRAINT ch_lucky_777_result
+              CHECK (last_result IS NULL OR last_result IN ('JACKPOT_777', 'TRIPLE', 'LOSE'));
+
+        - createIndex:
+            tableName: lucky_777_spins
+            indexName: idx_lucky_777_spins_last_spin_at
+            columns:
+              - column:
+                  name: last_spin_at
