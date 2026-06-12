@@ -78,6 +78,9 @@ public class StartMenuHandler {
             }
         }
 
+        if (isNewUser) {
+            showSubscribeChannel(chatId, null);
+        }
         showStart(chatId, null, user);
     }
 
@@ -252,4 +255,13 @@ public class StartMenuHandler {
         sender.editOrSendMessage(chatId, messageId, textFactory.aboutServiceText(), keyboardFactory.getInfoButton(), "HTML");
     }
 
+    public void showSubscribeChannel(Long chatId, Integer messageId) {
+        sender.editOrSendMessage(
+                chatId,
+                messageId,
+                textFactory.channelSubscribeText(),
+                keyboardFactory.getSubscribeChannelKeyboard(),
+                "HTML"
+        );
+    }
 }

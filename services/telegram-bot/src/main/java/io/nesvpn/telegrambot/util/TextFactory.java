@@ -560,6 +560,14 @@ public class TextFactory {
             """, TEXT_ALERT);
     }
 
+    public String channelSubscribeText() {
+        return  """
+            %s <b>Рекомендуем подписаться на канал</b>
+            
+            <i>%s Чтобы быть в курсе всех новостей и анонсов, просим подписаться</i>
+            """.formatted(TEXT_DEVICE, TEXT_BULB);
+    }
+
     public String awaitingBalanceCryptoText(Double rubRate) {
         String formattedRate = String.format("%.2f", rubRate);
 
@@ -952,6 +960,7 @@ public class TextFactory {
             %s <b>Рассылка поставлена в очередь</b>
 
             Кампания: <code>%d</code>
+            Источник: <b>ручной</b>
             Получателей: %s
 
             Бот начнёт отправку автоматически и пришлёт итоговую статистику после завершения.
@@ -976,6 +985,7 @@ public class TextFactory {
             %s <b>Рассылка поставлена в очередь</b>
 
             Кампания: <code>%d</code>
+            Источник: <b>ручной</b>
             Статус: <b>%s</b>
 
             Получателей: %s
@@ -1014,6 +1024,7 @@ public class TextFactory {
             %s <b>Рассылка завершена</b>
 
             Кампания: <code>%d</code>
+            Источник: <b>ручной</b>
 
             Всего пользователей: <b>%d</b>
             Успешно отправлено: <b>%d</b>
