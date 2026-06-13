@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 27-add-lucky-777-available-notification
+      author: bulat
+      changes:
+        - addColumn:
+            tableName: lucky_777_spins
+            columns:
+              - column:
+                  name: last_available_notification_at
+                  type: TIMESTAMPTZ
+
+        - createIndex:
+            tableName: lucky_777_spins
+            indexName: idx_lucky_777_spins_available_notification
+            columns:
+              - column:
+                  name: last_spin_at
+              - column:
+                  name: last_available_notification_at

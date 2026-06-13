@@ -1,0 +1,72 @@
+databaseChangeLog:
+  - changeSet:
+      id: 28-create-subscription-expiration-notifications
+      author: bulat
+      changes:
+        - createTable:
+            tableName: subscription_expiration_notifications
+            columns:
+              - column:
+                  name: id
+                  type: BIGSERIAL
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: token_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: notification_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scheduled_at
+                  type: TIMESTAMPTZ
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sent_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: subscription_expiration_notifications
+            baseColumnNames: token_id
+            constraintName: fk_subscription_expiration_notifications_token
+            referencedTableName: tokens
+            referencedColumnNames: id
+            onDelete: CASCADE
+
+        - addUniqueConstraint:
+            tableName: subscription_expiration_notifications
+            columnNames: token_id, notification_type
+            constraintName: uq_subscription_expiration_notifications_token_type
+
+        - sql:
+            sql: |
+              ALTER TABLE subscription_expiration_notifications
+              ADD CONSTRAINT ch_subscription_expiration_notification_type
+              CHECK (notification_type IN ('TWO_DAYS', 'ONE_DAY', 'EXPIRED'));
+
+        - sql:
+            sql: |
+              CREATE INDEX idx_tokens_expiration_notifications_active_valid_to
+              ON tokens (valid_to)
+              WHERE valid_to IS NOT NULL AND LOWER(status) = 'active';
+
+        - sql:
+            sql: |
+              CREATE INDEX idx_tokens_expiration_notifications_valid_to
+              ON tokens (valid_to)
+              WHERE valid_to IS NOT NULL;

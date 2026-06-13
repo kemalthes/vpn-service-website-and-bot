@@ -46,6 +46,31 @@ public class OrderService {
         return savedOrder;
     }
 
+    @Transactional
+    public Order createLucky777BonusOrder(User user, VpnPlan plan, Integer diceValue) {
+        Order newOrder = new Order();
+        newOrder.setUserId(user.getId());
+        newOrder.setVpnPlanId(plan.getId());
+        newOrder.setStatus(OrderStatus.PAID.getValue());
+        Order savedOrder = orderRepository.save(newOrder);
+
+        String description = plan.getDuration() == 3
+                ? "Вы выиграли в 777 дополнительные 3 дня"
+                : "Вы выиграли в 777 дополнительный 1 день";
+
+        balanceService.addBalance(
+                user.getId(),
+                BigDecimal.ZERO,
+                TransactionType.LUCKY_777_WIN,
+                description + " (dice: " + diceValue + ")");
+
+        eventPublisher.publishEvent(new OrderPaidEvent(user.getId(),
+                savedOrder.getId(),
+                plan.getId(),
+                user.getTgId()));
+        return savedOrder;
+    }
+
     public Order getOrderById(Long orderId) {
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("Order not found with id: " + orderId));

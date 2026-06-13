@@ -1,5 +1,7 @@
 package io.nesvpn.telegrambot.util;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.nesvpn.telegrambot.dto.CryptoPayment;
 import io.nesvpn.telegrambot.dto.HwidDevice;
 import io.nesvpn.telegrambot.enums.PaymentMethod;
@@ -12,7 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +28,93 @@ import java.util.UUID;
 @Slf4j
 @Component
 public class KeyboardFactory {
+    private static final String STYLE_PRIMARY = "primary";
+    private static final String STYLE_SUCCESS = "success";
+    private static final String STYLE_DANGER = "danger";
+
+    private enum ButtonIcon {
+        PROFILE("5258362837411045098"),
+        SUBSCRIPTION("5359629206948976159"),
+        BALANCE("5258204546391351475"),
+        REFERRALS("5258513401784573443"),
+        INFO("5258503720928288433"),
+        CHANNEL("5260268501515377807"),
+        PAYMENT("5258368777350816286"),
+        REFRESH("5258420634785947640"),
+        CRYPTO("5359719332542718652"),
+        DOCUMENT("5258477770735885832"),
+        BOOK("5260512129240276089"),
+        SUPPORT("5258215846450305872"),
+        BACK("5258236805890710909"),
+        DEVICE("5258423306255604960"),
+        DELETE("5258130763148172425"),
+        HOME("5258084656674250503"),
+        ANDROID("5258093637450866522"),
+        LOCK("5258476306152038031"),
+        CHART("5258391025281408576"),
+        PACKAGE("5258134813302332906"),
+        SUCCESS("5260726538302660868"),
+        LUCKY("5258508428212445001"),
+        BROADCAST("5258477770735885832"),
+        SPIN("5258165702707125574"),
+        PLUS("5258108352008823107");
+
+        private final String customEmojiId;
+
+        ButtonIcon(String customEmojiId) {
+            this.customEmojiId = customEmojiId;
+        }
+    }
+
+    private static class IconInlineKeyboardButton extends InlineKeyboardButton {
+        private String iconCustomEmojiId;
+        private String style;
+
+        @JsonProperty("icon_custom_emoji_id")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String getIconCustomEmojiId() {
+            return iconCustomEmojiId;
+        }
+
+        public void setIconCustomEmojiId(String iconCustomEmojiId) {
+            this.iconCustomEmojiId = iconCustomEmojiId;
+        }
+
+        @JsonProperty("style")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String getStyle() {
+            return style;
+        }
+
+        public void setStyle(String style) {
+            this.style = style;
+        }
+    }
+
+    private static class IconKeyboardButton extends KeyboardButton {
+        private String iconCustomEmojiId;
+        private String style;
+
+        @JsonProperty("icon_custom_emoji_id")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String getIconCustomEmojiId() {
+            return iconCustomEmojiId;
+        }
+
+        public void setIconCustomEmojiId(String iconCustomEmojiId) {
+            this.iconCustomEmojiId = iconCustomEmojiId;
+        }
+
+        @JsonProperty("style")
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        public String getStyle() {
+            return style;
+        }
+
+        public void setStyle(String style) {
+            this.style = style;
+        }
+    }
 
     private final PaymentService paymentService;
     private final TonPaymentService tonPaymentService;
@@ -45,44 +138,77 @@ public class KeyboardFactory {
         this.tonPaymentService = tonPaymentService;
     }
 
+    private InlineKeyboardButton inlineButton(String text, ButtonIcon icon) {
+        IconInlineKeyboardButton button = new IconInlineKeyboardButton();
+        button.setText(text);
+        button.setIconCustomEmojiId(icon.customEmojiId);
+        return button;
+    }
+
+    private InlineKeyboardButton inlineButton(String text, ButtonIcon icon, String style) {
+        IconInlineKeyboardButton button = new IconInlineKeyboardButton();
+        button.setText(text);
+        button.setIconCustomEmojiId(icon.customEmojiId);
+        button.setStyle(style);
+        return button;
+    }
+
+    private KeyboardButton keyboardButton(String text, ButtonIcon icon) {
+        IconKeyboardButton button = new IconKeyboardButton();
+        button.setText(text);
+        button.setIconCustomEmojiId(icon.customEmojiId);
+        return button;
+    }
+
+    private KeyboardButton keyboardButton(String text, ButtonIcon icon, String style) {
+        IconKeyboardButton button = new IconKeyboardButton();
+        button.setText(text);
+        button.setIconCustomEmojiId(icon.customEmojiId);
+        button.setStyle(style);
+        return button;
+    }
+
     public InlineKeyboardMarkup getMainMenuInline() {
+        return getMainMenuInline(false);
+    }
+
+    public InlineKeyboardMarkup getMainMenuInline(boolean canBroadcast) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton profileBtn = new InlineKeyboardButton();
-        profileBtn.setText("👤 Профиль");
+        InlineKeyboardButton profileBtn = inlineButton("Профиль", ButtonIcon.PROFILE, STYLE_SUCCESS);
         profileBtn.setCallbackData("profile");
         row1.add(profileBtn);
 
-        InlineKeyboardButton subscriptionsBtn = new InlineKeyboardButton();
-        subscriptionsBtn.setText("📱 Подписка");
+        InlineKeyboardButton subscriptionsBtn = inlineButton("Подписка", ButtonIcon.SUBSCRIPTION, STYLE_PRIMARY);
         subscriptionsBtn.setCallbackData("subscription");
         row1.add(subscriptionsBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton balanceBtn = new InlineKeyboardButton();
-        balanceBtn.setText("💰 Баланс");
+        InlineKeyboardButton balanceBtn = inlineButton("Баланс", ButtonIcon.BALANCE);
         balanceBtn.setCallbackData("balance");
         row2.add(balanceBtn);
 
-        InlineKeyboardButton referralBtn = new InlineKeyboardButton();
-        referralBtn.setText("👥 Рефералы");
+        InlineKeyboardButton referralBtn = inlineButton("Рефералы", ButtonIcon.REFERRALS);
         referralBtn.setCallbackData("referrals");
         row2.add(referralBtn);
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton infoBtn = new InlineKeyboardButton();
-        infoBtn.setText("\uD83C\uDF10 О сервисe");
+        InlineKeyboardButton infoBtn = inlineButton("О сервисe", ButtonIcon.INFO);
         infoBtn.setCallbackData("info");
         row3.add(infoBtn);
+        if (canBroadcast) {
+            InlineKeyboardButton broadcastBtn = inlineButton("Рассылка", ButtonIcon.BROADCAST, STYLE_PRIMARY);
+            broadcastBtn.setCallbackData("broadcast");
+            row3.add(broadcastBtn);
+        }
         rows.add(row3);
 
         List<InlineKeyboardButton> row4 = new ArrayList<>();
-        InlineKeyboardButton channelBtn = new InlineKeyboardButton();
-        channelBtn.setText("\uD83D\uDCE2 Наш канал");
+        InlineKeyboardButton channelBtn = inlineButton("Наш канал", ButtonIcon.CHANNEL);
         channelBtn.setUrl("https://t.me/nesvpn");
 
         row4.add(channelBtn);
@@ -121,15 +247,13 @@ public class KeyboardFactory {
         String url = plategaPayUrl + "?id=" + payment.getTransactionToken() + "&mh=" + merchantId;
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton payButton = new InlineKeyboardButton();
-        payButton.setText("💳 Оплатить");
+        InlineKeyboardButton payButton = inlineButton("Оплатить", ButtonIcon.PAYMENT, STYLE_PRIMARY);
         payButton.setUrl(url);
         row1.add(payButton);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton checkButton = new InlineKeyboardButton();
-        checkButton.setText("🔄 Проверить оплату");
+        InlineKeyboardButton checkButton = inlineButton("Проверить оплату", ButtonIcon.REFRESH, STYLE_SUCCESS);
         checkButton.setCallbackData("check_payment_sbp" + payment.getTransactionToken());
         row2.add(checkButton);
         rows.add(row2);
@@ -144,22 +268,19 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton sbpButton = new InlineKeyboardButton();
-        sbpButton.setText("💳 По СБП");
+        InlineKeyboardButton sbpButton = inlineButton("По СБП", ButtonIcon.PAYMENT);
         sbpButton.setCallbackData("payment_method_sbp");
         row1.add(sbpButton);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton cryptoButton = new InlineKeyboardButton();
-        cryptoButton.setText("\uD83D\uDCB2 USDT (Ton)");
+        InlineKeyboardButton cryptoButton = inlineButton("USDT (Ton)", ButtonIcon.CRYPTO);
         cryptoButton.setCallbackData("payment_method_usdt");
         row2.add(cryptoButton);
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton backButton = new InlineKeyboardButton();
-        backButton.setText("◀️ Назад");
+        InlineKeyboardButton backButton = inlineButton("Назад", ButtonIcon.BACK);
         backButton.setCallbackData("back");
         row3.add(backButton);
         rows.add(row3);
@@ -178,8 +299,7 @@ public class KeyboardFactory {
         String tonLink = cryptoPayment.getTonLink();
         if (tonLink != null) {
             List<InlineKeyboardButton> row1 = new ArrayList<>();
-            InlineKeyboardButton sendButton = new InlineKeyboardButton();
-            sendButton.setText("\uD83D\uDE80 Оплатить");
+            InlineKeyboardButton sendButton = inlineButton("Оплатить", ButtonIcon.PAYMENT, STYLE_PRIMARY);
             sendButton.setUrl(tonLink);
             row1.add(sendButton);
             rows.add(row1);
@@ -187,8 +307,7 @@ public class KeyboardFactory {
 
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton checkButton = new InlineKeyboardButton();
-        checkButton.setText("🔄 Проверить оплату");
+        InlineKeyboardButton checkButton = inlineButton("Проверить оплату", ButtonIcon.REFRESH, STYLE_SUCCESS);
         checkButton.setCallbackData("check_payment_crypto_" + payment.getTransactionToken());
         row2.add(checkButton);
         rows.add(row2);
@@ -206,8 +325,7 @@ public class KeyboardFactory {
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
 
-        InlineKeyboardButton titleButton = new InlineKeyboardButton();
-        titleButton.setText("📢 Подписаться на канал");
+        InlineKeyboardButton titleButton = inlineButton("Подписаться на канал", ButtonIcon.CHANNEL);
         titleButton.setUrl(channelLink);
         row1.add(titleButton);
 
@@ -222,27 +340,23 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton privacyButton = new InlineKeyboardButton();
-        privacyButton.setText("\uD83D\uDCDC Политика конфиденциальности");
-        privacyButton.setUrl("https://telegra.ph/Politika-konfidencialnosti-08-15-17");
+        InlineKeyboardButton privacyButton = inlineButton("Политика конфиденциальности", ButtonIcon.DOCUMENT);
+        privacyButton.setUrl("https://telegra.ph/Politika-konfidencialnosti-04-01-26");
         row1.add(privacyButton);
 
-        InlineKeyboardButton agreementButton = new InlineKeyboardButton();
-        agreementButton.setText("\uD83D\uDCD8 Пользовательское соглашение");
-        agreementButton.setUrl("https://telegra.ph/Polzovatelskoe-soglashenie-08-15-10");
+        InlineKeyboardButton agreementButton = inlineButton("Пользовательское соглашение", ButtonIcon.BOOK);
+        agreementButton.setUrl("https://telegra.ph/Polzovatelskoe-soglashenie-04-01-19");
         row1.add(agreementButton);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton supportButton = new InlineKeyboardButton();
-        supportButton.setText("\uD83D\uDCAC Поддержка NesVPN");
+        InlineKeyboardButton supportButton = inlineButton("Поддержка NesVPN", ButtonIcon.SUPPORT);
         supportButton.setUrl("t.me/" + support);
         row2.add(supportButton);
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         row3.add(backBtn);
         rows.add(row3);
@@ -256,10 +370,41 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         row.add(backBtn);
+        rows.add(row);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup getBroadcastAwaitingPostKeyboard() {
+        return getBackButton();
+    }
+
+    public InlineKeyboardMarkup getBroadcastProgressKeyboard(Long campaignId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton refreshBtn = inlineButton("Обновить", ButtonIcon.REFRESH, STYLE_SUCCESS);
+        refreshBtn.setCallbackData("broadcast_refresh_" + campaignId);
+        row.add(refreshBtn);
+        rows.add(row);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup getBroadcastHomeKeyboard() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton startBtn = inlineButton("Главная", ButtonIcon.HOME, STYLE_SUCCESS);
+        startBtn.setCallbackData("broadcast_home");
+        row.add(startBtn);
         rows.add(row);
 
         markup.setKeyboard(rows);
@@ -273,7 +418,6 @@ public class KeyboardFactory {
         hwidDevices.forEach(device -> {
             List<InlineKeyboardButton> row = new ArrayList<>();
 
-            InlineKeyboardButton button = new InlineKeyboardButton();
             String model = device.getDeviceModel() != null
                     ? device.getDeviceModel()
                     : "Устройство";
@@ -293,22 +437,23 @@ public class KeyboardFactory {
             }
 
             int MAX_LEN = 64;
-            String text = "📱 " + (clientText != null ? clientText + " • " : "") + model + " • " + date;
+            String text = (clientText != null ? clientText + " • " : "") + model + " • " + date;
 
             if (text.length() > MAX_LEN) {
                 text = text.substring(0, MAX_LEN);
             }
 
-            button.setText(text);
-            button.setCallbackData("delete_hwid_confirm_" + device.getHwid());
+            IconInlineKeyboardButton deviceBtn = new IconInlineKeyboardButton();
+            deviceBtn.setText(text);
+            deviceBtn.setIconCustomEmojiId(ButtonIcon.DEVICE.customEmojiId);
+            deviceBtn.setCallbackData("delete_hwid_confirm_" + device.getHwid());
 
-            row.add(button);
+            row.add(deviceBtn);
             rows.add(row);
         });
 
         List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         row.add(backBtn);
         rows.add(row);
@@ -322,13 +467,11 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         row.add(backBtn);
 
-        InlineKeyboardButton deleteBtn = new InlineKeyboardButton();
-        deleteBtn.setText("\uD83D\uDDD1️ Удалить");
+        InlineKeyboardButton deleteBtn = inlineButton("Удалить", ButtonIcon.DELETE, STYLE_DANGER);
         deleteBtn.setCallbackData("delete_hwid_confirmation_" + hwid);
         row.add(deleteBtn);
 
@@ -343,15 +486,13 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton subscriptionsBtn = new InlineKeyboardButton();
-        subscriptionsBtn.setText("📱 Подписка");
+        InlineKeyboardButton subscriptionsBtn = inlineButton("Подписка", ButtonIcon.SUBSCRIPTION, STYLE_PRIMARY);
         subscriptionsBtn.setCallbackData("subscription");
         row1.add(subscriptionsBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton startBtn = new InlineKeyboardButton();
-        startBtn.setText("◀️ Главное меню");
+        InlineKeyboardButton startBtn = inlineButton("Главное меню", ButtonIcon.HOME);
         startBtn.setCallbackData("start");
         row2.add(startBtn);
         rows.add(row2);
@@ -365,32 +506,27 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton androidBtn = new InlineKeyboardButton();
-        androidBtn.setText("📱 Android");
+        InlineKeyboardButton androidBtn = inlineButton("Android", ButtonIcon.ANDROID);
         androidBtn.setCallbackData("instructions_android");
         row1.add(androidBtn);
 
-        InlineKeyboardButton iosBtn = new InlineKeyboardButton();
-        iosBtn.setText("🔐 iOS");
+        InlineKeyboardButton iosBtn = inlineButton("iOS", ButtonIcon.LOCK);
         iosBtn.setCallbackData("instructions_ios");
         row1.add(iosBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton windowsBtn = new InlineKeyboardButton();
-        windowsBtn.setText("🌐 Windows");
+        InlineKeyboardButton windowsBtn = inlineButton("Windows", ButtonIcon.DEVICE);
         windowsBtn.setCallbackData("instructions_windows");
         row2.add(windowsBtn);
 
-        InlineKeyboardButton macosBtn = new InlineKeyboardButton();
-        macosBtn.setText("🍎 MacOS");
+        InlineKeyboardButton macosBtn = inlineButton("MacOS", ButtonIcon.DEVICE);
         macosBtn.setCallbackData("instructions_macos");
         row2.add(macosBtn);
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         row3.add(backBtn);
         rows.add(row3);
@@ -404,21 +540,18 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton historyBtn = new InlineKeyboardButton();
-        historyBtn.setText("📊 История операций");
+        InlineKeyboardButton historyBtn = inlineButton("История операций", ButtonIcon.CHART);
         historyBtn.setCallbackData("balance_history");
         row1.add(historyBtn);
 
-        InlineKeyboardButton topupBtn = new InlineKeyboardButton();
-        topupBtn.setText("💳 Пополнить");
+        InlineKeyboardButton topupBtn = inlineButton("Пополнить", ButtonIcon.PAYMENT, STYLE_PRIMARY);
         topupBtn.setCallbackData("balance_topup");
         row1.add(topupBtn);
 
         rows.add(row1);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         row3.add(backBtn);
         rows.add(row3);
@@ -433,31 +566,77 @@ public class KeyboardFactory {
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
 
-        InlineKeyboardButton extendBtn = new InlineKeyboardButton();
-        extendBtn.setText(isActive ? "🔄 Продлить" : "🔄 Возобновить");
+        InlineKeyboardButton extendBtn = inlineButton(isActive ? "Продлить" : "Возобновить", ButtonIcon.REFRESH, STYLE_PRIMARY);
         extendBtn.setCallbackData("subscription_extend");
         row1.add(extendBtn);
 
-        InlineKeyboardButton devicesBtn = new InlineKeyboardButton();
-        devicesBtn.setText(String.format("📱 Устройства (%d)", devicesCount));
+        String devicesButtonText = devicesCount != null
+                ? String.format("Устройства (%d)", devicesCount)
+                : "Устройства";
+        InlineKeyboardButton devicesBtn = inlineButton(devicesButtonText, ButtonIcon.DEVICE);
         devicesBtn.setCallbackData("subscription_devices");
         row1.add(devicesBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton instructionBtn = new InlineKeyboardButton();
-        instructionBtn.setText("📖 Инструкция");
-        instructionBtn.setCallbackData("instructions");
-        row2.add(instructionBtn);
+        InlineKeyboardButton luckyBtn = inlineButton("Попытать удачу", ButtonIcon.LUCKY, STYLE_SUCCESS);
+        luckyBtn.setCallbackData("subscription_lucky_777");
+        row2.add(luckyBtn);
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
-        backBtn.setCallbackData("back");
-        row3.add(backBtn);
+        InlineKeyboardButton instructionBtn = inlineButton("Инструкция", ButtonIcon.BOOK);
+        instructionBtn.setCallbackData("instructions");
+        row3.add(instructionBtn);
         rows.add(row3);
 
+        List<InlineKeyboardButton> row4 = new ArrayList<>();
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
+        backBtn.setCallbackData("back");
+        row4.add(backBtn);
+        rows.add(row4);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public ReplyKeyboardMarkup getLucky777ReplyKeyboard() {
+        ReplyKeyboardMarkup markup = new ReplyKeyboardMarkup();
+        markup.setResizeKeyboard(true);
+        markup.setOneTimeKeyboard(false);
+        markup.setSelective(true);
+
+        KeyboardRow row = new KeyboardRow();
+        row.add(keyboardButton("Назад", ButtonIcon.BACK));
+        row.add(keyboardButton("🎰", ButtonIcon.SPIN, STYLE_SUCCESS));
+
+        List<KeyboardRow> rows = new ArrayList<>();
+        rows.add(row);
+        markup.setKeyboard(rows);
+
+        return markup;
+    }
+
+    public ReplyKeyboardRemove getRemoveReplyKeyboard() {
+        ReplyKeyboardRemove remove = new ReplyKeyboardRemove();
+        remove.setRemoveKeyboard(true);
+        return remove;
+    }
+
+    public InlineKeyboardMarkup getLucky777AvailableNotificationKeyboard() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
+        backBtn.setCallbackData("subscription");
+        row.add(backBtn);
+
+        InlineKeyboardButton spinBtn = inlineButton("Прокрутить", ButtonIcon.SPIN, STYLE_SUCCESS);
+        spinBtn.setCallbackData("subscription_lucky_777");
+        row.add(spinBtn);
+
+        rows.add(row);
         markup.setKeyboard(rows);
         return markup;
     }
@@ -468,22 +647,19 @@ public class KeyboardFactory {
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
 
-        InlineKeyboardButton extendBtn = new InlineKeyboardButton();
-        extendBtn.setText("Получить 2 дня бесплатно");
+        InlineKeyboardButton extendBtn = inlineButton("Получить 2 дня бесплатно", ButtonIcon.PLUS, STYLE_SUCCESS);
         extendBtn.setCallbackData("get_2_days_free_" + userId);
         row1.add(extendBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton instructionBtn = new InlineKeyboardButton();
-        instructionBtn.setText("📖 Инструкция");
+        InlineKeyboardButton instructionBtn = inlineButton("Инструкция", ButtonIcon.BOOK);
         instructionBtn.setCallbackData("instructions");
         row2.add(instructionBtn);
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         row3.add(backBtn);
         rows.add(row3);
@@ -499,16 +675,14 @@ public class KeyboardFactory {
 
         for (VpnPlan plan : plans) {
             List<InlineKeyboardButton> row = new ArrayList<>();
-            InlineKeyboardButton planBtn = new InlineKeyboardButton();
-            planBtn.setText(String.format("📦 %s — %d₽", plan.getName(), plan.getPrice()));
+            InlineKeyboardButton planBtn = inlineButton(String.format("%s — %d₽", plan.getName(), plan.getPrice()), ButtonIcon.PACKAGE);
             planBtn.setCallbackData("extend_confirm_" + tokenId + "_" + plan.getId());
             row.add(planBtn);
             rows.add(row);
         }
 
         List<InlineKeyboardButton> backRow = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад");
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
         backRow.add(backBtn);
         rows.add(backRow);
@@ -522,15 +696,13 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
-        InlineKeyboardButton confirmBtn = new InlineKeyboardButton();
-        confirmBtn.setText("✅ Подтвердить продление");
+        InlineKeyboardButton confirmBtn = inlineButton("Подтвердить продление", ButtonIcon.SUCCESS, STYLE_SUCCESS);
         confirmBtn.setCallbackData("extend_process_" + tokenId + "_" + planId);
         row1.add(confirmBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton cancelBtn = new InlineKeyboardButton();
-        cancelBtn.setText("◀️ Назад");
+        InlineKeyboardButton cancelBtn = inlineButton("Назад", ButtonIcon.BACK);
         cancelBtn.setCallbackData("back");
         row2.add(cancelBtn);
         rows.add(row2);
@@ -544,8 +716,7 @@ public class KeyboardFactory {
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton backBtn = new InlineKeyboardButton();
-        backBtn.setText("◀️ Назад к подписке");
+        InlineKeyboardButton backBtn = inlineButton("Назад к подписке", ButtonIcon.BACK);
         backBtn.setCallbackData("subscription");
         row.add(backBtn);
         rows.add(row);
@@ -554,5 +725,3 @@ public class KeyboardFactory {
         return markup;
     }
 }
-
-

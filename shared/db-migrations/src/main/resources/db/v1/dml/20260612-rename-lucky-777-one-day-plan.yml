@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 26-rename-lucky-777-one-day-plan
+      author: bulat
+      changes:
+        - update:
+            tableName: vpn_plans
+            columns:
+              - column:
+                  name: name
+                  value: "777 бонус 1 день"
+            where: "country = 'Bonus' AND duration = 1 AND price = 0 AND name = '777 утешительный'"

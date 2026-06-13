@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: 34-update-broadcast-processing-statuses
+      author: bulat
+      validCheckSum: "9:e68b370d1fb699e6407eebcb5e7455a7"
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE broadcast_campaigns
+              DROP CONSTRAINT IF EXISTS ch_broadcast_campaign_status;
+
+              ALTER TABLE broadcast_campaigns
+              ADD CONSTRAINT ch_broadcast_campaign_status
+              CHECK (status IN ('PREPARING', 'PROCESSING', 'COMPLETED', 'FAILED'));
+
+        - sql:
+            sql: |
+              CREATE INDEX IF NOT EXISTS idx_broadcast_campaigns_active
+              ON broadcast_campaigns (created_at)
+              WHERE status IN ('PREPARING', 'PROCESSING');
+
+        - sql:
+            sql: |
+              CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_created_at
+              ON broadcast_recipients (created_at);
+
+        - addColumn:
+            tableName: broadcast_campaigns
+            columns:
+              - column:
+                  name: message_text
+                  type: TEXT
+              - column:
+                  name: message_entities
+                  type: TEXT

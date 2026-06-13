@@ -1,6 +1,12 @@
 package io.nesvpn.telegrambot.handler;
 
 import io.nesvpn.telegrambot.enums.BotState;
+import io.nesvpn.telegrambot.handler.common.TelegramMessageSender;
+import io.nesvpn.telegrambot.handler.sections.BalancePaymentHandler;
+import io.nesvpn.telegrambot.handler.sections.BroadcastHandler;
+import io.nesvpn.telegrambot.handler.sections.Lucky777Handler;
+import io.nesvpn.telegrambot.handler.sections.StartMenuHandler;
+import io.nesvpn.telegrambot.handler.sections.SubscriptionHandler;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.services.TelegramUserService;
 import io.nesvpn.telegrambot.services.UserService;
@@ -18,18 +24,34 @@ import java.util.UUID;
 public class CallbackQueryHandler {
 
     private final VpnBot vpnBot;
-    private final MessageHandler messageHandler;
+    private final StartMenuHandler startMenuHandler;
+    private final BalancePaymentHandler balancePaymentHandler;
+    private final SubscriptionHandler subscriptionHandler;
+    private final Lucky777Handler lucky777Handler;
+    private final BroadcastHandler broadcastHandler;
     private final UserService userService;
     private final TelegramUserService telegramUserService;
+    private final TelegramMessageSender sender;
 
     public CallbackQueryHandler(
             @Lazy VpnBot vpnBot,
-            MessageHandler messageHandler,
-            UserService userService, TelegramUserService telegramUserService) {
+            StartMenuHandler startMenuHandler,
+            BalancePaymentHandler balancePaymentHandler,
+            SubscriptionHandler subscriptionHandler,
+            Lucky777Handler lucky777Handler,
+            BroadcastHandler broadcastHandler,
+            UserService userService,
+            TelegramUserService telegramUserService,
+            TelegramMessageSender sender) {
         this.vpnBot = vpnBot;
-        this.messageHandler = messageHandler;
+        this.startMenuHandler = startMenuHandler;
+        this.balancePaymentHandler = balancePaymentHandler;
+        this.subscriptionHandler = subscriptionHandler;
+        this.lucky777Handler = lucky777Handler;
+        this.broadcastHandler = broadcastHandler;
         this.userService = userService;
         this.telegramUserService = telegramUserService;
+        this.sender = sender;
     }
 
     public void handle(CallbackQuery callbackQuery) {
@@ -40,59 +62,75 @@ public class CallbackQueryHandler {
 
         answerCallback(callbackQuery.getId(), null);
 
+        BotState currentState = BotState.fromString(telegramUserService.findOrCreate(tgId).getState());
+        if (currentState == BotState.SUBSCRIPTION_LUCKY_777 && !data.equals("subscription_lucky_777")) {
+            sender.removeReplyKeyboard(chatId);
+        }
+
         User user = userService.findOrCreateByTgId(tgId);
 
         switch (data) {
-            case "start" -> messageHandler.showStart(chatId, messageId, user);
+            case "start" -> startMenuHandler.showStart(chatId, messageId, user);
             case "back" -> handleBack(chatId, messageId, user);
-            case "profile" -> messageHandler.showProfile(chatId, messageId, user);
-            case "referrals" -> messageHandler.showReferrals(chatId, messageId, user);
-            case "instructions" -> messageHandler.showInstructions(chatId, messageId, user);
-            case "instructions_android" -> messageHandler.showAndroidInstructions(chatId, messageId, user);
-            case "instructions_ios" -> messageHandler.showIosInstructions(chatId, messageId, user);
-            case "instructions_windows" -> messageHandler.showWindowsInstructions(chatId, messageId, user);
-            case "instructions_macos" -> messageHandler.showMacosInstructions(chatId, messageId, user);
-            case "balance" -> messageHandler.showBalance(chatId, messageId, user);
-            case "balance_history" -> messageHandler.showBalanceHistory(chatId, messageId, user);
-            case "balance_topup" -> messageHandler.showTopUp(chatId, messageId);
-            case "payment_method_sbp" -> messageHandler.showAwaitingBalance(chatId, messageId, user);
-            case "payment_method_usdt" -> messageHandler.showAwaitingBalanceWithCrypto(chatId, messageId, user);
-            case "subscription" -> messageHandler.showSubscription(chatId, messageId, user);
-            case "subscription_devices" -> messageHandler.showHwidDevices(chatId, messageId, user);
-            case "subscription_extend" -> messageHandler.showSubscriptionExtend(chatId, messageId, user);
-            case "info" -> messageHandler.showAboutService(chatId, messageId);
+            case "profile" -> startMenuHandler.showProfile(chatId, messageId, user);
+            case "referrals" -> startMenuHandler.showReferrals(chatId, messageId, user);
+            case "instructions" -> startMenuHandler.showInstructions(chatId, messageId, user);
+            case "instructions_android" -> startMenuHandler.showAndroidInstructions(chatId, messageId, user);
+            case "instructions_ios" -> startMenuHandler.showIosInstructions(chatId, messageId, user);
+            case "instructions_windows" -> startMenuHandler.showWindowsInstructions(chatId, messageId, user);
+            case "instructions_macos" -> startMenuHandler.showMacosInstructions(chatId, messageId, user);
+            case "balance" -> balancePaymentHandler.showBalance(chatId, messageId, user);
+            case "balance_history" -> balancePaymentHandler.showBalanceHistory(chatId, messageId, user);
+            case "balance_topup" -> balancePaymentHandler.showTopUp(chatId, messageId);
+            case "payment_method_sbp" -> balancePaymentHandler.showAwaitingBalance(chatId, messageId, user);
+            case "payment_method_usdt" -> balancePaymentHandler.showAwaitingBalanceWithCrypto(chatId, messageId, user);
+            case "subscription" -> subscriptionHandler.showSubscription(chatId, messageId, user);
+            case "subscription_devices" -> subscriptionHandler.showHwidDevices(chatId, messageId, user);
+            case "subscription_extend" -> subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
+            case "subscription_lucky_777" -> lucky777Handler.showLucky777(chatId, messageId, user);
+            case "info" -> startMenuHandler.showAboutService(chatId, messageId);
+            case "broadcast" -> broadcastHandler.showBroadcast(chatId, messageId, user);
+            case "broadcast_home" -> broadcastHandler.showBroadcastHome(chatId, messageId, user);
         }
 
         if (data.startsWith("check_payment_sbp")) {
             String[] parts = data.replace("check_payment_sbp", "").split("_");
             String transactionId = parts[0];
-            messageHandler.checkPayment(chatId, messageId, transactionId, user);
+            balancePaymentHandler.checkPayment(chatId, messageId, transactionId, user);
         } else if (data.startsWith("extend_confirm_")) {
             String[] parts = data.replace("extend_confirm_", "").split("_");
             Long tokenId = Long.parseLong(parts[0]);
             Long planId = Long.parseLong(parts[1]);
-            messageHandler.showExtendConfirm(chatId, messageId, tokenId, planId, user);
+            subscriptionHandler.showExtendConfirm(chatId, messageId, tokenId, planId, user);
         } else if (data.startsWith("extend_process_")) {
             String[] parts = data.replace("extend_process_", "").split("_");
             Long tokenId = Long.parseLong(parts[0]);
             Long planId = Long.parseLong(parts[1]);
-            messageHandler.showExtendProcess(chatId, messageId, tokenId, planId, user);
+            subscriptionHandler.showExtendProcess(chatId, messageId, tokenId, planId, user);
         } else if (data.startsWith("check_payment_crypto_")) {
             String[] parts = data.replace("check_payment_crypto_", "").split("_");
             String transactionId = parts[0];
-            messageHandler.checkPayment(chatId, messageId, transactionId, user);
+            balancePaymentHandler.checkPayment(chatId, messageId, transactionId, user);
         } else if (data.startsWith("delete_hwid_confirm_")) {
             String hwid = data.replace("delete_hwid_confirm_", "");
-            messageHandler.showDeleteHwidDeviceConfirm(chatId, messageId, hwid, user);
+            subscriptionHandler.showDeleteHwidDeviceConfirm(chatId, messageId, hwid, user);
         } else if (data.startsWith("delete_hwid_confirmation_")) {
             String hwid = data.replace("delete_hwid_confirmation_", "");
             log.info("showDeleteHwidDevice CALLED");
-            messageHandler.showDeleteHwidDevice(chatId, messageId, hwid, user);
+            subscriptionHandler.showDeleteHwidDevice(chatId, messageId, hwid, user);
+        } else if (data.startsWith("broadcast_refresh_")) {
+            String campaignIdText = data.replace("broadcast_refresh_", "");
+            try {
+                Long campaignId = Long.parseLong(campaignIdText);
+                broadcastHandler.refreshBroadcastProgress(chatId, messageId, user, campaignId);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid broadcast refresh callback payload: {}", data, e);
+            }
         } else if (data.startsWith("get_2_days_free_")) {
             String[] parts = data.replace("get_2_days_free_", "").split("_");
             try {
                 UUID userId = UUID.fromString(parts[0]);
-                messageHandler.processFreeSubscription(chatId, messageId, user, userId);
+                subscriptionHandler.processFreeSubscription(chatId, messageId, user, userId);
             } catch (IllegalArgumentException e) {
                 log.warn("Invalid free subscription callback payload: {}", data, e);
             }
@@ -107,32 +145,35 @@ public class CallbackQueryHandler {
 
         switch (previousState) {
             case PROFILE:
-                messageHandler.showProfile(chatId, messageId, user);
+                startMenuHandler.showProfile(chatId, messageId, user);
                 break;
             case REFERRALS:
-                messageHandler.showReferrals(chatId, messageId, user);
+                startMenuHandler.showReferrals(chatId, messageId, user);
                 break;
             case SUBSCRIPTIONS:
-                messageHandler.showSubscription(chatId, messageId, user);
+                subscriptionHandler.showSubscription(chatId, messageId, user);
                 break;
             case BALANCE:
-                messageHandler.showBalance(chatId, messageId, user);
+                balancePaymentHandler.showBalance(chatId, messageId, user);
                 break;
             case BALANCE_TOP_UP:
-                messageHandler.showTopUp(chatId, messageId);
+                balancePaymentHandler.showTopUp(chatId, messageId);
                 break;
             case INSTRUCTIONS:
-                messageHandler.showInstructions(chatId, messageId, user);
+                startMenuHandler.showInstructions(chatId, messageId, user);
                 break;
             case SUBSCRIPTION_HWID_DEVICES:
-                messageHandler.showHwidDevices(chatId, messageId, user);
+                subscriptionHandler.showHwidDevices(chatId, messageId, user);
                 break;
             case SUBSCRIPTIONS_EXTEND:
-                messageHandler.showSubscriptionExtend(chatId, messageId, user);
+                subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
+                break;
+            case SUBSCRIPTION_LUCKY_777:
+                lucky777Handler.showLucky777(chatId, messageId, user);
                 break;
             case START:
             default:
-                messageHandler.showStart(chatId, messageId, user);
+                startMenuHandler.showStart(chatId, messageId, user);
         }
     }
 

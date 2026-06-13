@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface VpnPlanRepository extends JpaRepository<VpnPlan, Long> {
@@ -12,4 +13,6 @@ public interface VpnPlanRepository extends JpaRepository<VpnPlan, Long> {
     List<VpnPlan> findAllByOrderByDurationAsc();
 
     List<VpnPlan> findByCountry(String country);
+
+    Optional<VpnPlan> findFirstByCountryAndDurationOrderByIdAsc(String country, Integer duration);
 }

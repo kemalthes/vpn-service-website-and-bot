@@ -1,0 +1,33 @@
+databaseChangeLog:
+  - changeSet:
+      id: 29-update-subscription-expiration-notifications-token-valid-to
+      author: bulat
+      changes:
+        - addColumn:
+            tableName: subscription_expiration_notifications
+            columns:
+              - column:
+                  name: token_valid_to
+                  type: TIMESTAMPTZ
+
+        - sql:
+            sql: |
+              UPDATE subscription_expiration_notifications notification
+              SET token_valid_to = token.valid_to
+              FROM tokens token
+              WHERE notification.token_id = token.id
+                AND notification.token_valid_to IS NULL;
+
+        - addNotNullConstraint:
+            tableName: subscription_expiration_notifications
+            columnName: token_valid_to
+            columnDataType: TIMESTAMPTZ
+
+        - dropUniqueConstraint:
+            tableName: subscription_expiration_notifications
+            constraintName: uq_subscription_expiration_notifications_token_type
+
+        - addUniqueConstraint:
+            tableName: subscription_expiration_notifications
+            columnNames: token_id, notification_type, token_valid_to
+            constraintName: uq_subscription_expiration_notifications_token_type_valid_to

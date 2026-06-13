@@ -18,7 +18,7 @@ public class VpnPlanService {
 
     public List<VpnPlan> getAllPlans() {
         List<VpnPlan> plans =  vpnPlanRepository.findAllByOrderByDurationAsc();
-        return plans.stream().filter(c -> c.getId() != 4).toList();
+        return plans.stream().filter(c -> c.getPrice() > 0).toList();
     }
 
     public List<VpnPlan> getPlansByCountry(String country) {
@@ -27,5 +27,9 @@ public class VpnPlanService {
 
     public Optional<VpnPlan> findById(Long id) {
         return vpnPlanRepository.findById(id);
+    }
+
+    public Optional<VpnPlan> findLucky777Plan(Integer duration) {
+        return vpnPlanRepository.findFirstByCountryAndDurationOrderByIdAsc("Bonus", duration);
     }
 }

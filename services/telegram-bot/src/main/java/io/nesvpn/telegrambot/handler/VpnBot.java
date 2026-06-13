@@ -21,7 +21,9 @@ public class VpnBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update.hasMessage() && update.getMessage().hasText()) {
+        if (update.hasMessage() && update.getMessage().hasDice()) {
+            messageHandler.handleDice(update.getMessage());
+        } else if (update.hasMessage()) {
             messageHandler.handle(update.getMessage());
         } else if (update.hasCallbackQuery()) {
             callbackQueryHandler.handle(update.getCallbackQuery());

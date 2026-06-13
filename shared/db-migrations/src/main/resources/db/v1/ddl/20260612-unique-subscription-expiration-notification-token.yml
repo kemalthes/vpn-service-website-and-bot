@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 31-unique-subscription-expiration-notification-token
+      author: bulat
+      changes:
+        - dropUniqueConstraint:
+            tableName: subscription_expiration_notifications
+            constraintName: uq_subscription_expiration_notifications_token_type_valid_to
+
+        - sql:
+            sql: |
+              DELETE FROM subscription_expiration_notifications notification
+              USING (
+                  SELECT id
+                  FROM (
+                      SELECT
+                          id,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY token_id
+                              ORDER BY sent_at DESC, id DESC
+                          ) AS row_number
+                      FROM subscription_expiration_notifications
+                  ) ranked
+                  WHERE ranked.row_number > 1
+              ) duplicates
+              WHERE notification.id = duplicates.id;
+
+        - addUniqueConstraint:
+            tableName: subscription_expiration_notifications
+            columnNames: token_id
+            constraintName: uq_subscription_expiration_notifications_token
