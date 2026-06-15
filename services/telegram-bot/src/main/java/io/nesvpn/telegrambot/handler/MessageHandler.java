@@ -8,8 +8,10 @@ import io.nesvpn.telegrambot.handler.sections.Lucky777Handler;
 import io.nesvpn.telegrambot.handler.sections.StartMenuHandler;
 import io.nesvpn.telegrambot.handler.sections.SubscriptionHandler;
 import io.nesvpn.telegrambot.model.TelegramUser;
+import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.services.BroadcastService;
 import io.nesvpn.telegrambot.services.TelegramUserService;
+import io.nesvpn.telegrambot.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -26,6 +28,7 @@ public class MessageHandler {
     private final Lucky777Handler lucky777Handler;
     private final BroadcastHandler broadcastHandler;
     private final TelegramMessageSender sender;
+    private final UserService userService;
 
     public void handle(Message message) {
         String text = message.getText();
@@ -34,13 +37,15 @@ public class MessageHandler {
         }
 
         Long fromId = message.getFrom().getId();
+        boolean isNewUser = !userService.existsByTgId(fromId);
+        User user = userService.findOrCreateByTgId(fromId);
         TelegramUser currentTelegramUser = telegramUserService.findOrCreate(fromId);
         if (isNavigationCommand(text)) {
             sender.removeReplyKeyboard(message.getChatId());
         }
 
         if (text != null && text.startsWith("/start")) {
-            startMenuHandler.handleStart(message);
+            startMenuHandler.handleStart(message, isNewUser, user);
         } else if ("/profile".equals(text)) {
             startMenuHandler.handleProfile(message);
         } else if ("/referrals".equals(text)) {
