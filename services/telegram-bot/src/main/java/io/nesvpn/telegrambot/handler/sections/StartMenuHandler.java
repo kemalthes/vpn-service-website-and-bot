@@ -52,14 +52,11 @@ public class StartMenuHandler {
         this.sender = sender;
     }
 
-    public void handleStart(Message message) {
+    public void handleStart(Message message, boolean isNewUser, User user) {
         String text = message.getText();
         Long userId = message.getFrom().getId();
         Long chatId = message.getChatId();
 
-        boolean isNewUser = !userService.existsByTgId(userId);
-        User user = userService.findOrCreateByTgId(userId);
-        telegramUserService.findOrCreate(userId);
         telegramUserService.setState(userId, BotState.START);
 
         if (isNewUser && text != null && text.length() > 7) {

@@ -60,14 +60,13 @@ public class CallbackQueryHandler {
         Long tgId = callbackQuery.getFrom().getId();
         Integer messageId = callbackQuery.getMessage().getMessageId();
 
-        answerCallback(callbackQuery.getId(), null);
+        answerCallback(callbackQuery.getId());
+        User user = userService.findOrCreateByTgId(tgId);
 
         BotState currentState = BotState.fromString(telegramUserService.findOrCreate(tgId).getState());
         if (currentState == BotState.SUBSCRIPTION_LUCKY_777 && !data.equals("subscription_lucky_777")) {
             sender.removeReplyKeyboard(chatId);
         }
-
-        User user = userService.findOrCreateByTgId(tgId);
 
         switch (data) {
             case "start" -> startMenuHandler.showStart(chatId, messageId, user);
@@ -177,19 +176,15 @@ public class CallbackQueryHandler {
         }
     }
 
-    private void answerCallback(String callbackId, String text) {
+    private void answerCallback(String callbackId) {
         AnswerCallbackQuery answer = new AnswerCallbackQuery();
         answer.setCallbackQueryId(callbackId);
-
-        if (text != null) {
-            answer.setText(text);
-            answer.setShowAlert(true);
-        }
 
         try {
             vpnBot.execute(answer);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            log.error("Failed to answer callback query", e);
+            throw new RuntimeException(e);
         }
     }
 }
