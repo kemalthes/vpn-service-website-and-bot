@@ -633,6 +633,24 @@ public class KeyboardFactory {
         return remove;
     }
 
+    public InlineKeyboardMarkup getLucky777AvailableNotificationKeyboard() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
+        backBtn.setCallbackData("subscription");
+        row.add(backBtn);
+
+        InlineKeyboardButton luckyBtn = inlineButton("Попытать удачу", ButtonIcon.LUCKY, STYLE_PRIMARY);
+        luckyBtn.setCallbackData("subscription_lucky_777");
+        row.add(luckyBtn);
+
+        rows.add(row);
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
     public InlineKeyboardMarkup getSubscriptionKeyboardFirst(UUID userId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
