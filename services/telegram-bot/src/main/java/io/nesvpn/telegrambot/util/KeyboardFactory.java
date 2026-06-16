@@ -560,7 +560,7 @@ public class KeyboardFactory {
         return markup;
     }
 
-    public InlineKeyboardMarkup getSubscriptionKeyboard(boolean isActive, Integer devicesCount) {
+    public InlineKeyboardMarkup getSubscriptionKeyboard(boolean isActive, Integer devicesCount, boolean autoRenewalEnabled) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
@@ -579,22 +579,32 @@ public class KeyboardFactory {
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
-        InlineKeyboardButton luckyBtn = inlineButton("Попытать удачу", ButtonIcon.LUCKY, STYLE_SUCCESS);
-        luckyBtn.setCallbackData("subscription_lucky_777");
-        row2.add(luckyBtn);
+        InlineKeyboardButton autoRenewalBtn = inlineButton(
+                "Автопродление: " + (autoRenewalEnabled ? "ВКЛ" : "ВЫКЛ"),
+                ButtonIcon.PAYMENT,
+                autoRenewalEnabled ? STYLE_SUCCESS : STYLE_DANGER
+        );
+        autoRenewalBtn.setCallbackData("subscription_auto_renewal_toggle");
+        row2.add(autoRenewalBtn);
         rows.add(row2);
 
         List<InlineKeyboardButton> row3 = new ArrayList<>();
-        InlineKeyboardButton instructionBtn = inlineButton("Инструкция", ButtonIcon.BOOK);
-        instructionBtn.setCallbackData("instructions");
-        row3.add(instructionBtn);
+        InlineKeyboardButton luckyBtn = inlineButton("Попытать удачу", ButtonIcon.LUCKY, STYLE_PRIMARY);
+        luckyBtn.setCallbackData("subscription_lucky_777");
+        row3.add(luckyBtn);
         rows.add(row3);
 
         List<InlineKeyboardButton> row4 = new ArrayList<>();
+        InlineKeyboardButton instructionBtn = inlineButton("Инструкция", ButtonIcon.BOOK);
+        instructionBtn.setCallbackData("instructions");
+        row4.add(instructionBtn);
+        rows.add(row4);
+
+        List<InlineKeyboardButton> row5 = new ArrayList<>();
         InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
         backBtn.setCallbackData("back");
-        row4.add(backBtn);
-        rows.add(row4);
+        row5.add(backBtn);
+        rows.add(row5);
 
         markup.setKeyboard(rows);
         return markup;
@@ -621,24 +631,6 @@ public class KeyboardFactory {
         ReplyKeyboardRemove remove = new ReplyKeyboardRemove();
         remove.setRemoveKeyboard(true);
         return remove;
-    }
-
-    public InlineKeyboardMarkup getLucky777AvailableNotificationKeyboard() {
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-
-        List<InlineKeyboardButton> row = new ArrayList<>();
-        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
-        backBtn.setCallbackData("subscription");
-        row.add(backBtn);
-
-        InlineKeyboardButton spinBtn = inlineButton("Прокрутить", ButtonIcon.SPIN, STYLE_SUCCESS);
-        spinBtn.setCallbackData("subscription_lucky_777");
-        row.add(spinBtn);
-
-        rows.add(row);
-        markup.setKeyboard(rows);
-        return markup;
     }
 
     public InlineKeyboardMarkup getSubscriptionKeyboardFirst(UUID userId) {

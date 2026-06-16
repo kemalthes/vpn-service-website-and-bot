@@ -52,6 +52,9 @@ public class User {
     @OneToMany(mappedBy = "referrer", fetch = FetchType.LAZY)
     private List<User> referrals;
 
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    private SubscriptionAutoRenewalSetting autoRenewalSetting;
+
     @Column(name = "balance", precision = 12, scale = 2, nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
 

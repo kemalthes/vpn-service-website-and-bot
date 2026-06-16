@@ -128,7 +128,7 @@ public class Lucky777Handler {
         return sender.trySendMessage(
                 chatId,
                 textFactory.lucky777AvailableNotificationText(),
-                keyboardFactory.getLucky777AvailableNotificationKeyboard(),
+                null,
                 "HTML"
         );
     }

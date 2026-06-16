@@ -86,6 +86,7 @@ public class CallbackQueryHandler {
             case "subscription" -> subscriptionHandler.showSubscription(chatId, messageId, user);
             case "subscription_devices" -> subscriptionHandler.showHwidDevices(chatId, messageId, user);
             case "subscription_extend" -> subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
+            case "subscription_auto_renewal_toggle" -> subscriptionHandler.toggleAutoRenewal(chatId, messageId, user);
             case "subscription_lucky_777" -> lucky777Handler.showLucky777(chatId, messageId, user);
             case "info" -> startMenuHandler.showAboutService(chatId, messageId);
             case "broadcast" -> broadcastHandler.showBroadcast(chatId, messageId, user);

@@ -10,6 +10,7 @@ import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.model.VpnPlan;
 import io.nesvpn.telegrambot.services.FreeSubscriptionAwaitService;
 import io.nesvpn.telegrambot.services.OrderService;
+import io.nesvpn.telegrambot.services.SubscriptionAutoRenewalService;
 import io.nesvpn.telegrambot.services.TelegramUserService;
 import io.nesvpn.telegrambot.services.TokenService;
 import io.nesvpn.telegrambot.services.UserService;
@@ -39,6 +40,7 @@ public class SubscriptionHandler {
     private final TokenService tokenService;
     private final OrderService orderService;
     private final VpnPlanService vpnPlanService;
+    private final SubscriptionAutoRenewalService subscriptionAutoRenewalService;
     private final FreeSubscriptionAwaitService freeSubscriptionAwaitService;
     private final StartMenuHandler startMenuHandler;
     private final TextFactory textFactory;
@@ -97,14 +99,20 @@ public class SubscriptionHandler {
             String validTo = token.getValidTo() != null
                     ? Formatter.formatMoscow(token.getValidTo())
                     : "Не указано";
+            boolean autoRenewalEnabled = subscriptionAutoRenewalService.isEnabled(user.getId());
             sender.editOrSendMessage(
                     chatId,
                     messageId,
-                    textFactory.subscriptionText(isActive, tokenUrl, validTo, daysLeft, devicesCount),
-                    keyboardFactory.getSubscriptionKeyboard(token.isActive(), devicesCount),
+                    textFactory.subscriptionText(isActive, tokenUrl, validTo, daysLeft, devicesCount, autoRenewalEnabled),
+                    keyboardFactory.getSubscriptionKeyboard(token.isActive(), devicesCount, autoRenewalEnabled),
                     "HTML"
             );
         }
+    }
+
+    public void toggleAutoRenewal(Long chatId, Integer messageId, User user) {
+        subscriptionAutoRenewalService.toggle(user);
+        showSubscription(chatId, messageId, user);
     }
 
     public void showHwidDevices(Long chatId, Integer messageId, User user) {
@@ -255,6 +263,35 @@ public class SubscriptionHandler {
                 chatId,
                 null,
                 textFactory.subscriptionExpirationNotificationText(type, validTo),
+                keyboardFactory.getExpiringSubscriptionMenu(),
+                "HTML"
+        );
+    }
+
+    public boolean showSubscriptionAutoRenewalSuccessNotification(
+            Long chatId,
+            Integer planPrice,
+            BigDecimal balanceAfter
+    ) {
+        return sender.trySendMessage(
+                chatId,
+                textFactory.subscriptionAutoRenewalSuccessText(planPrice, balanceAfter),
+                keyboardFactory.getBackToSubscriptionKeyboard(),
+                "HTML"
+        );
+    }
+
+    public boolean showSubscriptionAutoRenewalFailedNotification(
+            Long chatId,
+            SubscriptionExpirationNotificationType type,
+            String validTo,
+            Integer planPrice,
+            BigDecimal balance
+    ) {
+        return sender.tryEditOrSendMessage(
+                chatId,
+                null,
+                textFactory.subscriptionExpirationAutoRenewalFailedText(type, validTo, planPrice, balance),
                 keyboardFactory.getExpiringSubscriptionMenu(),
                 "HTML"
         );

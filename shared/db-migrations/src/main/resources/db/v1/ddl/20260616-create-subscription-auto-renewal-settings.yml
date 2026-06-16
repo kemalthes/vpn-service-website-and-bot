@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: 36-create-subscription-auto-renewal-settings
+      author: bulat
+      changes:
+        - createTable:
+            tableName: subscription_auto_renewal_settings
+            columns:
+              - column:
+                  name: user_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: pk_subscription_auto_renewal_settings
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMPTZ
+                  defaultValueComputed: NOW()
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: subscription_auto_renewal_settings
+            baseColumnNames: user_id
+            constraintName: fk_subscription_auto_renewal_settings_user
+            referencedTableName: users
+            referencedColumnNames: id
+            onDelete: CASCADE

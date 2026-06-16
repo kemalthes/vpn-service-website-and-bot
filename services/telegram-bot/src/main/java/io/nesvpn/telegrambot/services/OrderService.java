@@ -29,6 +29,15 @@ public class OrderService {
 
     @Transactional
     public Order createOrder(User user, VpnPlan plan) {
+        return createOrder(
+                user,
+                plan,
+                "Продление VPN-подписки на " + plan.getDuration() + " дней"
+        );
+    }
+
+    @Transactional
+    public Order createOrder(User user, VpnPlan plan, String balanceDescription) {
         Order newOrder = new Order();
         newOrder.setUserId(user.getId());
         newOrder.setVpnPlanId(plan.getId());
@@ -38,7 +47,7 @@ public class OrderService {
                 user.getId(),
                 BigDecimal.valueOf(plan.getPrice()),
                 TransactionType.SUBSCRIPTION_PURCHASE,
-                "Продление VPN-подписки на " + plan.getDuration() + " дней");
+                balanceDescription);
         eventPublisher.publishEvent(new OrderPaidEvent(user.getId(),
                 savedOrder.getId(),
                 plan.getId(),
