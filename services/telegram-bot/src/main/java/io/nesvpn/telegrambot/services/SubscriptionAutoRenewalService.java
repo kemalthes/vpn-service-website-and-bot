@@ -5,6 +5,7 @@ import io.nesvpn.telegrambot.model.SubscriptionAutoRenewalSetting;
 import io.nesvpn.telegrambot.model.User;
 import io.nesvpn.telegrambot.model.VpnPlan;
 import io.nesvpn.telegrambot.repository.SubscriptionAutoRenewalSettingRepository;
+import io.nesvpn.telegrambot.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class SubscriptionAutoRenewalService {
     private final SubscriptionAutoRenewalSettingRepository subscriptionAutoRenewalSettingRepository;
     private final VpnPlanService vpnPlanService;
     private final OrderService orderService;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public boolean isEnabled(UUID userId) {
@@ -36,24 +38,16 @@ public class SubscriptionAutoRenewalService {
     }
 
     @Transactional
-    public boolean toggle(User user) {
-        SubscriptionAutoRenewalSetting setting = subscriptionAutoRenewalSettingRepository.findById(user.getId())
+    public void toggle(UUID userId) {
+        SubscriptionAutoRenewalSetting setting = subscriptionAutoRenewalSettingRepository.findById(userId)
                 .orElseGet(() -> {
                     SubscriptionAutoRenewalSetting newSetting = new SubscriptionAutoRenewalSetting();
+                    User user = userRepository.getReferenceById(userId.toString());
                     newSetting.setUser(user);
-                    newSetting.setUserId(user.getId());
                     return newSetting;
                 });
-
         setting.setEnabled(!setting.isEnabled());
-        return subscriptionAutoRenewalSettingRepository.save(setting).isEnabled();
-    }
-
-    @Transactional
-    public AutoRenewalResult tryRenew(User user) {
-        SubscriptionAutoRenewalSetting setting = subscriptionAutoRenewalSettingRepository.findById(user.getId())
-                .orElse(null);
-        return tryRenew(user, setting, null);
+        subscriptionAutoRenewalSettingRepository.save(setting);
     }
 
     @Transactional
