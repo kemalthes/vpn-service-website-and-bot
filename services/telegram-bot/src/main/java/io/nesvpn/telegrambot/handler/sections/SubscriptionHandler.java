@@ -111,7 +111,7 @@ public class SubscriptionHandler {
     }
 
     public void toggleAutoRenewal(Long chatId, Integer messageId, User user) {
-        subscriptionAutoRenewalService.toggle(user);
+        subscriptionAutoRenewalService.toggle(user.getId());
         showSubscription(chatId, messageId, user);
     }
 
