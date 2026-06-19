@@ -13,6 +13,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Transactional
 public class VpnPlanService {
+    private static final Long ONE_MONTH_PLAN_ID = 1L;
 
     private final VpnPlanRepository vpnPlanRepository;
 
@@ -27,6 +28,10 @@ public class VpnPlanService {
 
     public Optional<VpnPlan> findById(Long id) {
         return vpnPlanRepository.findById(id);
+    }
+
+    public Optional<VpnPlan> findOneMonthPlan() {
+        return vpnPlanRepository.findById(ONE_MONTH_PLAN_ID);
     }
 
     public Optional<VpnPlan> findLucky777Plan(Integer duration) {

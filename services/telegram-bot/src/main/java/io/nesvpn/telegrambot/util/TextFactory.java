@@ -50,6 +50,7 @@ public class TextFactory {
     private static final String TEXT_STAR = customEmoji("5170202955713872686", "🔥");
     private static final String TEXT_ALERT = customEmoji("5172803236289053353", "😱");
     private static final String TEXT_NO_WIN = customEmoji("5170462573602013949", "😢");
+    private static final String TEXT_AUTO_RENEWAL = customEmoji("5368324170671202286", "⏰");
     private static final String SLOT_DICE = "<code>🎰</code>";
 
     @Value("${platega.pay-url}")
@@ -413,12 +414,62 @@ public class TextFactory {
         };
     }
 
-    public String subscriptionText(Boolean isActive, String tokenUrl, String validTo, Long daysLeft, Integer devicesCount) {
+    public String subscriptionExpirationAutoRenewalFailedText(
+            SubscriptionExpirationNotificationType type,
+            String validTo,
+            Integer planPrice,
+            BigDecimal balance
+    ) {
+        return subscriptionExpirationNotificationText(type, validTo).trim() + String.format("""
+
+
+            %s <b>Автопродление не удалось.</b>
+
+            Стоимость продления: <b>%d₽</b>
+            Ваш баланс: <b>%.2f₽</b>
+
+            Пополните баланс, чтобы подписка оставалась активной.
+            """,
+                TEXT_PAYMENT,
+                planPrice,
+                balance
+        );
+    }
+
+    public String subscriptionAutoRenewalSuccessText(Integer planPrice, BigDecimal balanceAfter) {
+        return String.format("""
+            %s <b>Автопродление выполнено</b>
+
+            У вас было включено автопродление, поэтому мы продлили подписку на <b>1 месяц</b>.
+
+            %s <b>Списано:</b> %d₽
+            %s <b>Баланс после списания:</b> %.2f₽
+
+            %s Подписка скоро обновится, ссылка останется прежней.
+            """,
+                TEXT_CHECK,
+                TEXT_PAYMENT,
+                planPrice,
+                TEXT_MONEY,
+                balanceAfter,
+                TEXT_REFRESH
+        );
+    }
+
+    public String subscriptionText(
+            Boolean isActive,
+            String tokenUrl,
+            String validTo,
+            Long daysLeft,
+            Integer devicesCount,
+            boolean autoRenewalEnabled
+    ) {
         String statusEmoji = Boolean.TRUE.equals(isActive) ? TEXT_CHECK : TEXT_ERROR;
         String statusText = Boolean.TRUE.equals(isActive) ? "Активна" : "Истекла";
         String devicesText = devicesCount != null
                 ? String.format("%d / %d", devicesCount, Math.max(devicesCount, maxDevices))
                 : "не удалось получить";
+        String autoRenewalText = autoRenewalEnabled ? "включен" : "выключен";
 
         return String.format("""
             %s <b>Ваша подписка</b>
@@ -433,6 +484,8 @@ public class TextFactory {
             Осталось дней: %d
             
             %s <b>Устройств всего:</b> %s
+
+            %s <b>Автопродление:</b> %s
             
             %s
             """,
@@ -446,6 +499,8 @@ public class TextFactory {
                 daysLeft,
                 TEXT_PEOPLE,
                 devicesText,
+                TEXT_AUTO_RENEWAL,
+                autoRenewalText,
                 daysLeft <= 7 && daysLeft > 0
                         ? "<i>" + TEXT_WARN + " Срок подписки истекает скоро! Продлите её.</i>"
                         : ""
@@ -519,7 +574,7 @@ public class TextFactory {
             
             Прошло 12 часов, и вы снова можете испытать удачу в Lucky 777.
             
-            Откройте рулетку и отправьте настоящий слот %s. Бонусные дни, если выпадет выигрыш, прибавятся к текущему сроку подписки.
+            Откройте раздел подписки, перейдите в Lucky 777 и отправьте настоящий слот %s. Бонусные дни, если выпадет выигрыш, прибавятся к текущему сроку подписки.
             """, TEXT_LUCKY, SLOT_DICE);
     }
 

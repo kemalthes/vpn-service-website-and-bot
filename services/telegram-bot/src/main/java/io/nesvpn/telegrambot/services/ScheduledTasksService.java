@@ -3,6 +3,7 @@ package io.nesvpn.telegrambot.services;
 import io.nesvpn.telegrambot.dto.broadcast.BroadcastDeliveryResult;
 import io.nesvpn.telegrambot.dto.broadcast.BroadcastStats;
 import io.nesvpn.telegrambot.dto.lucky777.Lucky777AvailableNotification;
+import io.nesvpn.telegrambot.dto.notification.AutoRenewalResult;
 import io.nesvpn.telegrambot.dto.notification.DueSubscriptionExpirationNotification;
 import io.nesvpn.telegrambot.handler.sections.BalancePaymentHandler;
 import io.nesvpn.telegrambot.handler.sections.BroadcastHandler;
@@ -11,7 +12,9 @@ import io.nesvpn.telegrambot.handler.sections.SubscriptionHandler;
 import io.nesvpn.telegrambot.model.BroadcastCampaign;
 import io.nesvpn.telegrambot.model.BroadcastRecipient;
 import io.nesvpn.telegrambot.model.Payment;
+import io.nesvpn.telegrambot.model.SubscriptionAutoRenewalSetting;
 import io.nesvpn.telegrambot.model.User;
+import io.nesvpn.telegrambot.model.VpnPlan;
 import io.nesvpn.telegrambot.util.Formatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +49,8 @@ public class ScheduledTasksService {
     private final UserService userService;
     private final Lucky777Service lucky777Service;
     private final SubscriptionExpirationNotificationService subscriptionExpirationNotificationService;
+    private final SubscriptionAutoRenewalService subscriptionAutoRenewalService;
+    private final VpnPlanService vpnPlanService;
     private final BroadcastService broadcastService;
 
     @Scheduled(fixedRate = 300000)
@@ -194,6 +199,13 @@ public class ScheduledTasksService {
                 .toList();
         Map<UUID, User> userMap = userService.getUsersByIds(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
+        Map<UUID, SubscriptionAutoRenewalSetting> renewalSettingsByUserId =
+                subscriptionAutoRenewalService.getSettingsByUserIds(userIds);
+        boolean hasEnabledAutoRenewal = renewalSettingsByUserId.values().stream()
+                .anyMatch(SubscriptionAutoRenewalSetting::isEnabled);
+        VpnPlan oneMonthPlan = hasEnabledAutoRenewal
+                ? vpnPlanService.findOneMonthPlan().orElse(null)
+                : null;
         List<DueSubscriptionExpirationNotification> sentNotifications = new ArrayList<>();
 
         for (DueSubscriptionExpirationNotification notification : notifications) {
@@ -208,10 +220,11 @@ public class ScheduledTasksService {
             }
 
             try {
-                if (subscriptionHandler.showSubscriptionExpirationNotification(
-                        user.getTgId(),
-                        notification.type(),
-                        Formatter.formatMoscow(notification.validTo())
+                if (processSubscriptionExpirationNotification(
+                        user,
+                        notification,
+                        renewalSettingsByUserId.get(user.getId()),
+                        oneMonthPlan
                 )) {
                     sentNotifications.add(notification);
                 }
@@ -227,6 +240,56 @@ public class ScheduledTasksService {
         }
 
         return sentNotifications;
+    }
+
+    private boolean processSubscriptionExpirationNotification(
+            User user,
+            DueSubscriptionExpirationNotification notification,
+            SubscriptionAutoRenewalSetting renewalSetting,
+            VpnPlan oneMonthPlan
+    ) {
+        AutoRenewalResult autoRenewalResult = subscriptionAutoRenewalService.tryRenew(user, renewalSetting, oneMonthPlan);
+        String validTo = Formatter.formatMoscow(notification.validTo());
+
+        if (autoRenewalResult.status() == AutoRenewalResult.Status.SUCCESS) {
+            boolean sent = subscriptionHandler.showSubscriptionAutoRenewalSuccessNotification(
+                    user.getTgId(),
+                    autoRenewalResult.plan().getPrice(),
+                    autoRenewalResult.balanceAfter()
+            );
+            if (!sent) {
+                log.warn(
+                        "Auto renewal succeeded but notification was not sent: tokenId={} userId={}",
+                        notification.tokenId(),
+                        notification.userId()
+                );
+            }
+            return true;
+        }
+
+        if (autoRenewalResult.status() == AutoRenewalResult.Status.INSUFFICIENT_FUNDS) {
+            return subscriptionHandler.showSubscriptionAutoRenewalFailedNotification(
+                    user.getTgId(),
+                    notification.type(),
+                    validTo,
+                    autoRenewalResult.plan().getPrice(),
+                    autoRenewalResult.balance()
+            );
+        }
+
+        if (autoRenewalResult.status() == AutoRenewalResult.Status.PLAN_NOT_FOUND) {
+            log.error(
+                    "Auto renewal one-month plan not found: tokenId={} userId={}",
+                    notification.tokenId(),
+                    notification.userId()
+            );
+        }
+
+        return subscriptionHandler.showSubscriptionExpirationNotification(
+                user.getTgId(),
+                notification.type(),
+                validTo
+        );
     }
 
     @Scheduled(fixedDelay = 60000)

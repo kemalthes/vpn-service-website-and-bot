@@ -84,3 +84,6 @@ databaseChangeLog:
   - include:
       file: ddl/20260612-add-broadcast-message-columns.yml
       relativeToChangelogFile: true
+  - include:
+      file: ddl/20260616-create-subscription-auto-renewal-settings.yml
+      relativeToChangelogFile: true
