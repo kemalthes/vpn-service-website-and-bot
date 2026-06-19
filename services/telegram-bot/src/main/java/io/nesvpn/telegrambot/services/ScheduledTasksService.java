@@ -50,6 +50,7 @@ public class ScheduledTasksService {
     private final Lucky777Service lucky777Service;
     private final SubscriptionExpirationNotificationService subscriptionExpirationNotificationService;
     private final SubscriptionAutoRenewalService subscriptionAutoRenewalService;
+    private final VpnPlanService vpnPlanService;
     private final BroadcastService broadcastService;
 
     @Scheduled(fixedRate = 300000)
@@ -203,7 +204,7 @@ public class ScheduledTasksService {
         boolean hasEnabledAutoRenewal = renewalSettingsByUserId.values().stream()
                 .anyMatch(SubscriptionAutoRenewalSetting::isEnabled);
         VpnPlan oneMonthPlan = hasEnabledAutoRenewal
-                ? subscriptionAutoRenewalService.findOneMonthPlan().orElse(null)
+                ? vpnPlanService.findOneMonthPlan().orElse(null)
                 : null;
         List<DueSubscriptionExpirationNotification> sentNotifications = new ArrayList<>();
 

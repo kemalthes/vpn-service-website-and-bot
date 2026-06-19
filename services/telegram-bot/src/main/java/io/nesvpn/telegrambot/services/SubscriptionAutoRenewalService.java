@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -36,26 +35,25 @@ public class SubscriptionAutoRenewalService {
                 .collect(Collectors.toMap(SubscriptionAutoRenewalSetting::getUserId, setting -> setting));
     }
 
-    @Transactional(readOnly = true)
-    public Optional<VpnPlan> findOneMonthPlan() {
-        return vpnPlanService.findOneMonthPlan();
-    }
-
     @Transactional
     public boolean toggle(User user) {
-        return Boolean.TRUE.equals(subscriptionAutoRenewalSettingRepository.toggleEnabled(user.getId()));
+        SubscriptionAutoRenewalSetting setting = subscriptionAutoRenewalSettingRepository.findById(user.getId())
+                .orElseGet(() -> {
+                    SubscriptionAutoRenewalSetting newSetting = new SubscriptionAutoRenewalSetting();
+                    newSetting.setUser(user);
+                    newSetting.setUserId(user.getId());
+                    return newSetting;
+                });
+
+        setting.setEnabled(!setting.isEnabled());
+        return subscriptionAutoRenewalSettingRepository.save(setting).isEnabled();
     }
 
     @Transactional
     public AutoRenewalResult tryRenew(User user) {
         SubscriptionAutoRenewalSetting setting = subscriptionAutoRenewalSettingRepository.findById(user.getId())
                 .orElse(null);
-        if (setting == null || !setting.isEnabled()) {
-            return new AutoRenewalResult(AutoRenewalResult.Status.DISABLED, null, user.getBalance(), null);
-        }
-
-        VpnPlan plan = vpnPlanService.findOneMonthPlan().orElse(null);
-        return tryRenew(user, setting, plan);
+        return tryRenew(user, setting, null);
     }
 
     @Transactional
@@ -63,18 +61,20 @@ public class SubscriptionAutoRenewalService {
         if (setting == null || !setting.isEnabled()) {
             return new AutoRenewalResult(AutoRenewalResult.Status.DISABLED, plan, user.getBalance(), null);
         }
-        if (plan == null) {
+
+        VpnPlan renewalPlan = plan != null ? plan : vpnPlanService.findOneMonthPlan().orElse(null);
+        if (renewalPlan == null) {
             return new AutoRenewalResult(AutoRenewalResult.Status.PLAN_NOT_FOUND, null, user.getBalance(), null);
         }
 
-        BigDecimal price = BigDecimal.valueOf(plan.getPrice());
+        BigDecimal price = BigDecimal.valueOf(renewalPlan.getPrice());
         BigDecimal balance = user.getBalance() != null ? user.getBalance() : BigDecimal.ZERO;
         if (balance.compareTo(price) < 0) {
-            return new AutoRenewalResult(AutoRenewalResult.Status.INSUFFICIENT_FUNDS, plan, balance, null);
+            return new AutoRenewalResult(AutoRenewalResult.Status.INSUFFICIENT_FUNDS, renewalPlan, balance, null);
         }
 
-        orderService.createOrder(user, plan, getBalanceDescription(plan));
-        return new AutoRenewalResult(AutoRenewalResult.Status.SUCCESS, plan, balance, balance.subtract(price));
+        orderService.createOrder(user, renewalPlan, getBalanceDescription(renewalPlan));
+        return new AutoRenewalResult(AutoRenewalResult.Status.SUCCESS, renewalPlan, balance, balance.subtract(price));
     }
 
     public String getBalanceDescription(VpnPlan plan) {
