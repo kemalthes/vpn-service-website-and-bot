@@ -20,6 +20,8 @@ public interface UserRepository extends JpaRepository<User, String> {
 
     List<User> findAllByIdIn(Collection<UUID> id);
 
+    User getReferenceById(UUID id);
+
     Optional<User> findByReferralCode(String referralCode);
 
     List<User> findAllByReferredBy(Long referredBy);

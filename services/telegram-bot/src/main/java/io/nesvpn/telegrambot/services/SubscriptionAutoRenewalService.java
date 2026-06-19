@@ -42,7 +42,7 @@ public class SubscriptionAutoRenewalService {
         SubscriptionAutoRenewalSetting setting = subscriptionAutoRenewalSettingRepository.findById(userId)
                 .orElseGet(() -> {
                     SubscriptionAutoRenewalSetting newSetting = new SubscriptionAutoRenewalSetting();
-                    User user = userRepository.getReferenceById(userId.toString());
+                    User user = userRepository.getReferenceById(userId);
                     newSetting.setUser(user);
                     return newSetting;
                 });
