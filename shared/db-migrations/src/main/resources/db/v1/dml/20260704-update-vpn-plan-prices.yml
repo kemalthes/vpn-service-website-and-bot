@@ -1,0 +1,57 @@
+databaseChangeLog:
+  - changeSet:
+      id: 39-update-vpn-plan-prices-and-add-year-plan
+      author: codex
+      changes:
+        - sql:
+            sql: |
+              UPDATE vpn_plans
+              SET name = '1 месяц',
+                  price = 89,
+                  duration = 30,
+                  country = 'Netherlands',
+                  default_devices = 3
+              WHERE id = 1;
+
+              UPDATE vpn_plans
+              SET name = '3 месяца',
+                  price = 255,
+                  duration = 90,
+                  country = 'Netherlands',
+                  default_devices = 3
+              WHERE id = 2;
+
+              UPDATE vpn_plans
+              SET name = '6 месяцев',
+                  price = 479,
+                  duration = 180,
+                  country = 'Netherlands',
+                  default_devices = 3
+              WHERE id = 3;
+
+              INSERT INTO vpn_plans (id, name, price, duration, country, default_devices)
+              VALUES (7, '12 месяцев', 888, 360, 'Netherlands', 3)
+              ON CONFLICT (id) DO UPDATE
+              SET name = EXCLUDED.name,
+                  price = EXCLUDED.price,
+                  duration = EXCLUDED.duration,
+                  country = EXCLUDED.country,
+                  default_devices = EXCLUDED.default_devices;
+
+              INSERT INTO vpn_plan_features (vpn_plan_id, feature_key, value)
+              VALUES
+                (7, 'traffic_unlimited', 'Безлимитный трафик'),
+                (7, 'all_servers', 'Все серверы доступны'),
+                (7, 'support_24_7', '24/7 поддержка'),
+                (7, 'no_logs', 'Без логов'),
+                (7, 'devices_limit', 'До 3 устройств'),
+                (7, 'cheap_price', 'Самая выгодная цена')
+              ON CONFLICT (vpn_plan_id, feature_key) DO UPDATE
+              SET value = EXCLUDED.value;
+
+              UPDATE subscription_device_settings
+              SET price_per_device_month = 35,
+                  updated_at = NOW()
+              WHERE id = 1;
+
+              SELECT setval(pg_get_serial_sequence('vpn_plans', 'id'), (SELECT MAX(id) FROM vpn_plans));

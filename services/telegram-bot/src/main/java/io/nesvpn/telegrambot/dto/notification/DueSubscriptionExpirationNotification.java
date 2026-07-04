@@ -9,6 +9,8 @@ public record DueSubscriptionExpirationNotification(
         Long tokenId,
         UUID userId,
         LocalDateTime validTo,
+        Integer tokenMaxDevices,
+        Integer renewalTargetMaxDevices,
         SubscriptionExpirationNotificationType type
 ) {
 }

@@ -84,7 +84,9 @@ public class CallbackQueryHandler {
             case "payment_method_sbp" -> balancePaymentHandler.showAwaitingBalance(chatId, messageId, user);
             case "payment_method_usdt" -> balancePaymentHandler.showAwaitingBalanceWithCrypto(chatId, messageId, user);
             case "subscription" -> subscriptionHandler.showSubscription(chatId, messageId, user);
-            case "subscription_devices" -> subscriptionHandler.showHwidDevices(chatId, messageId, user);
+            case "subscription_devices" -> subscriptionHandler.showSubscriptionDevicesMenu(chatId, messageId, user);
+            case "subscription_devices_change" -> subscriptionHandler.showDeviceLimitInput(chatId, messageId, user);
+            case "subscription_devices_delete" -> subscriptionHandler.showHwidDevices(chatId, messageId, user);
             case "subscription_extend" -> subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
             case "subscription_auto_renewal_toggle" -> subscriptionHandler.toggleAutoRenewal(chatId, messageId, user);
             case "subscription_lucky_777" -> lucky777Handler.showLucky777(chatId, messageId, user);
@@ -99,14 +101,40 @@ public class CallbackQueryHandler {
             balancePaymentHandler.checkPayment(chatId, messageId, transactionId, user);
         } else if (data.startsWith("extend_confirm_")) {
             String[] parts = data.replace("extend_confirm_", "").split("_");
-            Long tokenId = Long.parseLong(parts[0]);
-            Long planId = Long.parseLong(parts[1]);
-            subscriptionHandler.showExtendConfirm(chatId, messageId, tokenId, planId, user);
+            try {
+                if (parts.length != 2) {
+                    log.warn("Invalid extend confirm callback payload: {}", data);
+                    subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
+                    return;
+                }
+                Long orderId = Long.parseLong(parts[0]);
+                Long planId = Long.parseLong(parts[1]);
+                subscriptionHandler.showExtendConfirm(chatId, messageId, orderId, planId, user);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid extend confirm callback payload: {}", data, e);
+                subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
+            }
         } else if (data.startsWith("extend_process_")) {
             String[] parts = data.replace("extend_process_", "").split("_");
-            Long tokenId = Long.parseLong(parts[0]);
-            Long planId = Long.parseLong(parts[1]);
-            subscriptionHandler.showExtendProcess(chatId, messageId, tokenId, planId, user);
+            try {
+                if (parts.length == 1) {
+                    Long orderId = Long.parseLong(parts[0]);
+                    subscriptionHandler.showExtendProcess(chatId, messageId, orderId, user);
+                } else if (parts.length == 2) {
+                    Long tokenId = Long.parseLong(parts[0]);
+                    Long planId = Long.parseLong(parts[1]);
+                    subscriptionHandler.showLegacyExtendProcess(chatId, messageId, tokenId, planId, user);
+                } else {
+                    log.warn("Invalid extend process callback payload: {}", data);
+                    subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
+                }
+            } catch (NumberFormatException e) {
+                log.warn("Invalid extend process callback payload: {}", data, e);
+                subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);
+            }
+        } else if (data.startsWith("device_limit_process_")) {
+            Long orderId = Long.parseLong(data.replace("device_limit_process_", ""));
+            subscriptionHandler.showDeviceLimitProcess(chatId, messageId, orderId, user);
         } else if (data.startsWith("check_payment_crypto_")) {
             String[] parts = data.replace("check_payment_crypto_", "").split("_");
             String transactionId = parts[0];
@@ -163,7 +191,10 @@ public class CallbackQueryHandler {
                 startMenuHandler.showInstructions(chatId, messageId, user);
                 break;
             case SUBSCRIPTION_HWID_DEVICES:
-                subscriptionHandler.showHwidDevices(chatId, messageId, user);
+                subscriptionHandler.showSubscriptionDevicesMenu(chatId, messageId, user);
+                break;
+            case SUBSCRIPTION_DEVICE_LIMIT_INPUT:
+                subscriptionHandler.showDeviceLimitInput(chatId, messageId, user);
                 break;
             case SUBSCRIPTIONS_EXTEND:
                 subscriptionHandler.showSubscriptionExtend(chatId, messageId, user);

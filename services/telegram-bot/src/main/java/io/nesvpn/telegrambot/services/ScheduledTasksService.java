@@ -5,6 +5,7 @@ import io.nesvpn.telegrambot.dto.broadcast.BroadcastStats;
 import io.nesvpn.telegrambot.dto.lucky777.Lucky777AvailableNotification;
 import io.nesvpn.telegrambot.dto.notification.AutoRenewalResult;
 import io.nesvpn.telegrambot.dto.notification.DueSubscriptionExpirationNotification;
+import io.nesvpn.telegrambot.handler.common.TelegramDeliveryStatus;
 import io.nesvpn.telegrambot.handler.sections.BalancePaymentHandler;
 import io.nesvpn.telegrambot.handler.sections.BroadcastHandler;
 import io.nesvpn.telegrambot.handler.sections.Lucky777Handler;
@@ -142,7 +143,9 @@ public class ScheduledTasksService {
             }
 
             try {
-                if (lucky777Handler.showLucky777AvailableNotification(user.getTgId())) {
+                TelegramDeliveryStatus deliveryStatus = lucky777Handler.showLucky777AvailableNotification(user.getTgId());
+                if (deliveryStatus == TelegramDeliveryStatus.SENT
+                        || deliveryStatus == TelegramDeliveryStatus.RECIPIENT_UNAVAILABLE) {
                     sentNotifications.add(notification);
                 }
             } catch (Exception e) {
@@ -248,33 +251,49 @@ public class ScheduledTasksService {
             SubscriptionAutoRenewalSetting renewalSetting,
             VpnPlan oneMonthPlan
     ) {
-        AutoRenewalResult autoRenewalResult = subscriptionAutoRenewalService.tryRenew(user, renewalSetting, oneMonthPlan);
+        AutoRenewalResult autoRenewalResult = subscriptionAutoRenewalService.tryRenew(
+                user,
+                renewalSetting,
+                oneMonthPlan,
+                notification.tokenId(),
+                notification.tokenMaxDevices(),
+                notification.renewalTargetMaxDevices());
         String validTo = Formatter.formatMoscow(notification.validTo());
 
         if (autoRenewalResult.status() == AutoRenewalResult.Status.SUCCESS) {
-            boolean sent = subscriptionHandler.showSubscriptionAutoRenewalSuccessNotification(
+            TelegramDeliveryStatus deliveryStatus = subscriptionHandler.showSubscriptionAutoRenewalSuccessNotification(
                     user.getTgId(),
-                    autoRenewalResult.plan().getPrice(),
-                    autoRenewalResult.balanceAfter()
+                    autoRenewalResult.chargedAmount() != null
+                            ? autoRenewalResult.chargedAmount().intValue()
+                            : autoRenewalResult.plan().getPrice(),
+                    autoRenewalResult.balanceAfter(),
+                    autoRenewalResult.oldMaxDevices(),
+                    autoRenewalResult.targetMaxDevices(),
+                    autoRenewalResult.requestedMaxDevices(),
+                    autoRenewalResult.deviceLimitFallback()
             );
-            if (!sent) {
+            if (deliveryStatus != TelegramDeliveryStatus.SENT) {
                 log.warn(
-                        "Auto renewal succeeded but notification was not sent: tokenId={} userId={}",
+                        "Auto renewal succeeded but notification was not sent: tokenId={} userId={} deliveryStatus={}",
                         notification.tokenId(),
-                        notification.userId()
+                        notification.userId(),
+                        deliveryStatus
                 );
             }
             return true;
         }
 
         if (autoRenewalResult.status() == AutoRenewalResult.Status.INSUFFICIENT_FUNDS) {
-            return subscriptionHandler.showSubscriptionAutoRenewalFailedNotification(
+            TelegramDeliveryStatus deliveryStatus = subscriptionHandler.showSubscriptionAutoRenewalFailedNotification(
                     user.getTgId(),
                     notification.type(),
                     validTo,
-                    autoRenewalResult.plan().getPrice(),
+                    autoRenewalResult.chargedAmount() != null
+                            ? autoRenewalResult.chargedAmount().intValue()
+                            : autoRenewalResult.plan().getPrice(),
                     autoRenewalResult.balance()
             );
+            return isNotificationProcessed(deliveryStatus);
         }
 
         if (autoRenewalResult.status() == AutoRenewalResult.Status.PLAN_NOT_FOUND) {
@@ -285,11 +304,17 @@ public class ScheduledTasksService {
             );
         }
 
-        return subscriptionHandler.showSubscriptionExpirationNotification(
+        TelegramDeliveryStatus deliveryStatus = subscriptionHandler.showSubscriptionExpirationNotification(
                 user.getTgId(),
                 notification.type(),
                 validTo
         );
+        return isNotificationProcessed(deliveryStatus);
+    }
+
+    private boolean isNotificationProcessed(TelegramDeliveryStatus deliveryStatus) {
+        return deliveryStatus == TelegramDeliveryStatus.SENT
+                || deliveryStatus == TelegramDeliveryStatus.RECIPIENT_UNAVAILABLE;
     }
 
     @Scheduled(fixedDelay = 60000)

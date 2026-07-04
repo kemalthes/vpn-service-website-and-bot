@@ -77,6 +77,17 @@ public class TokenService {
         return tokenRepository.findById(id);
     }
 
+    public Optional<Token> findByIdForUpdate(Long id) {
+        return tokenRepository.findByIdForUpdate(id);
+    }
+
+    public void updateRenewalTargetMaxDevices(Long tokenId, Integer renewalTargetMaxDevices) {
+        Token token = tokenRepository.findByIdForUpdate(tokenId)
+                .orElseThrow(() -> new IllegalArgumentException("Token not found with id: " + tokenId));
+        token.setRenewalTargetMaxDevices(renewalTargetMaxDevices);
+        tokenRepository.save(token);
+    }
+
     public String getFullTokenUrl(Token token) {
         return vpnHostUrl + token.getToken();
     }

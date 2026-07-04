@@ -47,6 +47,7 @@ project:
   vpn-panel-url: ${VPN_PANEL_DOMAIN}
   referral-percent: 20
   max-devices: 3
+  fallback-usd-to-rub-rate: ${FALLBACK_USD_TO_RUB_RATE:90}
 
 ton:
   usdt-master-address: ${USDT_MASTER_ADDRESS}

@@ -19,6 +19,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 
 @Component
 public class TextFactory {
@@ -73,6 +74,32 @@ public class TextFactory {
 
     private static String customEmoji(String customEmojiId, String fallbackEmoji) {
         return "<tg-emoji emoji-id=\"" + customEmojiId + "\">" + fallbackEmoji + "</tg-emoji>";
+    }
+
+    private static String formatDeviceCount(Integer count) {
+        if (count == null) {
+            return "не указано";
+        }
+
+        return count + " " + pluralizeDevice(count);
+    }
+
+    private static String pluralizeDevice(int count) {
+        int absCount = Math.abs(count);
+        int lastTwoDigits = absCount % 100;
+        if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+            return "устройств";
+        }
+
+        int lastDigit = absCount % 10;
+        if (lastDigit == 1) {
+            return "устройство";
+        }
+        if (lastDigit >= 2 && lastDigit <= 4) {
+            return "устройства";
+        }
+
+        return "устройств";
     }
 
     public String checkPaymentText(Payment payment) {
@@ -284,20 +311,21 @@ public class TextFactory {
 
     public String successSubscribeProvidedText() {
         return """
-        %s <b>Подписка скоро обновится</b>
-        
-        %s Вы успешно оплатили подписку!
-        
-        Ожидайте, в течение пары секунд
-        ваша ссылка обновится.
-        """.formatted(TEXT_WAIT, TEXT_CHECK);
+        %s <b>Оплата принята</b>
+
+        %s Заказ уже ушел на обновление подписки.
+        Обычно ссылка обновляется за <b>несколько секунд</b>.
+
+        %s Если экран не обновился сам, откройте раздел <b>Подписка</b> чуть позже.
+        """.formatted(TEXT_WAIT, TEXT_CHECK, TEXT_REFRESH);
     }
 
     public String dataNotFoundText() {
         return  """
-            %s <b>Данные не найдены</b>
+            %s <b>Не получилось найти данные</b>
 
-            Вернитесь назад:
+            Запрос мог устареть или данные уже изменились.
+            Нажмите <b>Назад</b> и откройте раздел заново.
             """.formatted(TEXT_ERROR);
     }
 
@@ -305,71 +333,127 @@ public class TextFactory {
         return String.format("""
             %s <b>Недостаточно средств</b>
             
-            <b>Стоимость:</b> %d₽
-            <b>Ваш баланс:</b> %.2f₽
+            %s <b>Стоимость:</b> %d₽
+            %s <b>Ваш баланс:</b> %.2f₽
             
-            Пополните баланс для продления подписки.
-            """, TEXT_ERROR, price, balance);
+            %s Пополните баланс и попробуйте снова.
+            """, TEXT_ERROR, TEXT_PAYMENT, price, TEXT_MONEY, balance, TEXT_BULB);
     }
 
-    public String extendSubscribeConfirmText(String planName, Integer planPrice, String currentValidTo, String newValidTo, BigDecimal balance) {
+    public String notEnoughMoneyMessage(BigDecimal price, BigDecimal balance) {
+        return String.format("""
+            %s <b>Недостаточно средств</b>
+
+            %s <b>Стоимость:</b> %.0f₽
+            %s <b>Ваш баланс:</b> %.2f₽
+
+            %s Пополните баланс и попробуйте снова.
+            """, TEXT_ERROR, TEXT_PAYMENT, price, TEXT_MONEY, balance, TEXT_BULB);
+    }
+
+    public String extendSubscribeConfirmText(
+            String planName,
+            BigDecimal planPrice,
+            String currentValidTo,
+            String newValidTo,
+            BigDecimal balance,
+            Integer currentMaxDevices,
+            Integer targetMaxDevices
+    ) {
+        boolean willDecreaseDevices = currentMaxDevices != null
+                && targetMaxDevices != null
+                && targetMaxDevices < currentMaxDevices;
+        String devicesText = Objects.equals(currentMaxDevices, targetMaxDevices)
+                ? String.format("<b>Лимит устройств:</b> %s", formatDeviceCount(targetMaxDevices))
+                : String.format("<b>Текущий лимит:</b> %s%n<b>После продления:</b> %s",
+                formatDeviceCount(currentMaxDevices), formatDeviceCount(targetMaxDevices));
+        String warningText = willDecreaseDevices
+                ? String.format("""
+
+                %s <b>Важно: лимит уменьшится</b>
+                После продления лимит станет: <b>%s</b>
+
+                <blockquote>Если сейчас подключено больше устройств, лишние привязки можно удалить через <b>Устройства</b> -> <b>Удалить устройства</b></blockquote>
+                """, TEXT_WARN, formatDeviceCount(targetMaxDevices))
+                : "";
         return  String.format("""
             %s <b>Подтверждение тарифа</b>
-            
+
             %s <b>Тариф:</b> %s
-            %s <b>Стоимость:</b> %d₽
-            
+            %s <b>Стоимость:</b> %.0f₽
+
+            %s
+
             <b>Текущий срок действия:</b>
             %s
-            
+
             <b>После продления:</b>
             %s
-            
+
             <b>Ваш баланс:</b> %.2f₽
-            
-            Подтвердите продление подписки
+
+            %s
             """,
                 TEXT_CHECK,
                 TEXT_PACKAGE,
                 planName,
                 TEXT_MONEY,
                 planPrice,
+                devicesText,
                 currentValidTo,
                 newValidTo,
-                balance
+                balance,
+                warningText
         );
     }
 
     public String tokenNotFoundText() {
         return """
-            %s <b>Продление подписки</b>
-            
-            У вас нет активной подписки, вернитесь назад:
-            """.formatted(TEXT_ERROR);
+            %s <b>Активной подписки нет</b>
+
+            %s Сначала оформите подписку.
+            После этого появятся <b>ссылка</b>, <b>устройства</b> и <b>продление</b>.
+
+            Нажмите <b>Назад</b> и выберите доступное действие.
+            """.formatted(TEXT_ERROR, TEXT_BULB);
     }
 
-    public String extendSubscriptionText(BigDecimal balance, String validTo, Long daysLeft) {
+    public String extendSubscriptionText(
+            BigDecimal balance,
+            String validTo,
+            Long daysLeft,
+            Integer currentMaxDevices,
+            Integer targetMaxDevices
+    ) {
+        String devicesText = Objects.equals(currentMaxDevices, targetMaxDevices)
+                ? String.format("Продление будет с текущим лимитом: <b>%s</b>", formatDeviceCount(currentMaxDevices))
+                : String.format("""
+                Следующее продление: <b>%s</b>
+                До конца срока: <b>%s</b>
+                """, formatDeviceCount(targetMaxDevices), formatDeviceCount(currentMaxDevices)).trim();
         return String.format("""
             %s <b>Продление подписки</b>
-            
+
             %s <b>Ваш баланс:</b> %.2f₽
-            
+
             <b>Текущий срок действия:</b>
             %s
-            
+
             %s <b>Осталось дней:</b> %d
-            
-            %s <b>Выберите срок продления:</b>
-            Чем дольше срок, тем выгоднее цена!
+
+            %s
+
+            %s <b>Выберите срок продления</b>
+            Чем дольше срок, тем выгоднее цена.
             """,
                 TEXT_REFRESH,
                 TEXT_MONEY,
                 balance,
                 validTo,
                 TEXT_WAIT,
-                daysLeft
-                ,
-                TEXT_USDT
+                daysLeft,
+                devicesText,
+                TEXT_PACKAGE
         );
     }
 
@@ -436,14 +520,44 @@ public class TextFactory {
         );
     }
 
-    public String subscriptionAutoRenewalSuccessText(Integer planPrice, BigDecimal balanceAfter) {
+    public String subscriptionAutoRenewalSuccessText(
+            Integer planPrice,
+            BigDecimal balanceAfter,
+            Integer oldMaxDevices,
+            Integer targetMaxDevices,
+            Integer requestedMaxDevices,
+            boolean deviceLimitFallback
+    ) {
+        String devicesText = "";
+        if (targetMaxDevices != null) {
+            if (deviceLimitFallback) {
+                devicesText = String.format("""
+
+                    %s <b>Лимит после продления:</b> %s
+                    %s Денег хватило только на стандартный лимит.
+                    Запрашивали: <b>%s</b>.
+                    """,
+                        TEXT_DEVICE,
+                        formatDeviceCount(targetMaxDevices),
+                        TEXT_WARN,
+                        formatDeviceCount(requestedMaxDevices != null ? requestedMaxDevices : targetMaxDevices));
+            } else if (oldMaxDevices != null && !Objects.equals(oldMaxDevices, targetMaxDevices)) {
+                devicesText = String.format("""
+
+                    %s <b>Лимит после продления:</b> %s
+                    """,
+                        TEXT_DEVICE,
+                        formatDeviceCount(targetMaxDevices));
+            }
+        }
+
         return String.format("""
             %s <b>Автопродление выполнено</b>
 
             У вас было включено автопродление, поэтому мы продлили подписку на <b>1 месяц</b>.
 
             %s <b>Списано:</b> %d₽
-            %s <b>Баланс после списания:</b> %.2f₽
+            %s <b>Баланс после списания:</b> %.2f₽%s
 
             %s Подписка скоро обновится, ссылка останется прежней.
             """,
@@ -452,6 +566,7 @@ public class TextFactory {
                 planPrice,
                 TEXT_MONEY,
                 balanceAfter,
+                devicesText,
                 TEXT_REFRESH
         );
     }
@@ -462,14 +577,19 @@ public class TextFactory {
             String validTo,
             Long daysLeft,
             Integer devicesCount,
+            Integer maxDevices,
+            Integer renewalTargetMaxDevices,
             boolean autoRenewalEnabled
     ) {
         String statusEmoji = Boolean.TRUE.equals(isActive) ? TEXT_CHECK : TEXT_ERROR;
         String statusText = Boolean.TRUE.equals(isActive) ? "Активна" : "Истекла";
         String devicesText = devicesCount != null
-                ? String.format("%d / %d", devicesCount, Math.max(devicesCount, maxDevices))
-                : "не удалось получить";
-        String autoRenewalText = autoRenewalEnabled ? "включен" : "выключен";
+                ? String.format("%d / %d", devicesCount, maxDevices)
+                : String.format("не удалось получить / %d", maxDevices);
+        String renewalDevicesText = renewalTargetMaxDevices != null
+                ? String.format("%nПри следующем продлении: <b>%s</b>", formatDeviceCount(renewalTargetMaxDevices))
+                : "";
+        String autoRenewalText = autoRenewalEnabled ? "включено" : "выключено";
 
         return String.format("""
             %s <b>Ваша подписка</b>
@@ -483,7 +603,7 @@ public class TextFactory {
             Действует до: %s
             Осталось дней: %d
             
-            %s <b>Устройств всего:</b> %s
+            %s <b>Устройств всего:</b> %s%s
 
             %s <b>Автопродление:</b> %s
             
@@ -499,12 +619,124 @@ public class TextFactory {
                 daysLeft,
                 TEXT_PEOPLE,
                 devicesText,
+                renewalDevicesText,
                 TEXT_AUTO_RENEWAL,
                 autoRenewalText,
                 daysLeft <= 7 && daysLeft > 0
                         ? "<i>" + TEXT_WARN + " Срок подписки истекает скоро! Продлите её.</i>"
                         : ""
         ).trim();
+    }
+
+    public String subscriptionDevicesMenuText(
+            Integer devicesCount,
+            Integer maxDevices,
+            Integer renewalTargetMaxDevices
+    ) {
+        String devicesText = devicesCount != null
+                ? String.format("%d из %d", devicesCount, maxDevices)
+                : String.format("не удалось получить / %d", maxDevices);
+        int renewalDevices = renewalTargetMaxDevices != null ? renewalTargetMaxDevices : maxDevices;
+        String note = renewalTargetMaxDevices != null
+                ? """
+
+                %s<b>Важно:</b> Новый лимит применится только при следующем продлении
+
+                <blockquote>Чтобы вернуть продление с текущим лимитом, нажмите <b>Изменить количество устройств</b> и введите текущий лимит</blockquote>"""
+                .formatted(TEXT_WARN)
+                : "";
+
+        return String.format("""
+            %s <b>Устройства подписки</b>
+
+            %s <b>Сейчас привязано:</b> %s
+            <b>Текущий лимит:</b> %s
+            %s <b>При следующем продлении:</b> %s%s
+
+            %s Для продолжения выберите действие ниже
+            """, TEXT_DEVICE, TEXT_PEOPLE, devicesText, formatDeviceCount(maxDevices), TEXT_REFRESH, formatDeviceCount(renewalDevices), note, TEXT_POINT_DOWN).trim();
+    }
+
+    public String deviceLimitInputText(Integer standardDevices, Integer maxDevicesLimit, Integer currentMaxDevices, Integer renewalTargetMaxDevices) {
+        int renewalDevices = renewalTargetMaxDevices != null ? renewalTargetMaxDevices : currentMaxDevices;
+        String resetText = renewalTargetMaxDevices != null
+                ? String.format("%n%nЧтобы отменить будущее уменьшение, введите текущий лимит: <b>%d</b>", currentMaxDevices)
+                : "";
+        return String.format("""
+            %s <b>Изменение количества устройств</b>
+
+            Введите новое максимальное количество устройств: от <b>%d</b> до <b>%d</b>.
+
+            %s <b>Сейчас доступно:</b> %s
+            %s <b>При следующем продлении:</b> %s%s
+            """, TEXT_DEVICE, standardDevices, maxDevicesLimit, TEXT_PEOPLE, formatDeviceCount(currentMaxDevices), TEXT_REFRESH, formatDeviceCount(renewalDevices), resetText);
+    }
+
+    public String deviceLimitInputInvalidText(Integer standardDevices, Integer maxDevicesLimit) {
+        return String.format("""
+            %s <b>Неверное число</b>
+
+            Нужно ввести целое число от <b>%d</b> до <b>%d</b>.
+
+            Например: <code>%d</code>
+            """, TEXT_ERROR, standardDevices, maxDevicesLimit, standardDevices);
+    }
+
+    public String deviceLimitChangeConfirmText(
+            Integer currentMaxDevices,
+            Integer targetMaxDevices,
+            String validTo,
+            BigDecimal price,
+            Integer renewalTargetMaxDevices
+    ) {
+        String futureLimitText = renewalTargetMaxDevices != null
+                ? String.format("""
+
+                %s Ранее был выбран лимит для следующего продления: <b>%s</b>
+                После оплаты будущий лимит будет сброшен, и продления пойдут с новым лимитом <b>%s</b>
+                """, TEXT_WARN, formatDeviceCount(renewalTargetMaxDevices), formatDeviceCount(targetMaxDevices))
+                : "";
+        return String.format("""
+            %s <b>Подтвердите изменение лимита</b>
+
+            %s <b>Сейчас:</b> %s
+            %s <b>После оплаты:</b> %s
+            %s <b>Добавится:</b> %s
+
+            %s <b>Подписка действует до:</b>
+            %s
+
+            %s <b>К оплате:</b> %.0f₽%s
+            """, TEXT_CHECK, TEXT_DEVICE, formatDeviceCount(currentMaxDevices), TEXT_REFRESH, formatDeviceCount(targetMaxDevices), TEXT_PACKAGE, formatDeviceCount(targetMaxDevices - currentMaxDevices), TEXT_DATE, validTo, TEXT_MONEY, price, futureLimitText);
+    }
+
+    public String deviceLimitDecreaseSavedText(Integer currentMaxDevices, Integer targetMaxDevices) {
+        return String.format("""
+            %s <b>Готово</b>
+
+            %s До конца текущего срока лимит остается: <b>%s</b>
+            %s При следующем продлении лимит станет: <b>%s</b>
+
+            <blockquote>%s Если сейчас подключено больше, чем новый лимит (<b>%s</b>), лишние привязки можно удалить в разделе <b>Устройства</b></blockquote>
+            """, TEXT_CHECK, TEXT_DEVICE, formatDeviceCount(currentMaxDevices), TEXT_REFRESH, formatDeviceCount(targetMaxDevices), TEXT_WARN, formatDeviceCount(targetMaxDevices));
+    }
+
+    public String deviceLimitResetText(Integer currentMaxDevices, boolean changed) {
+        if (!changed) {
+            return String.format("""
+                %s <b>Лимит не изменился</b>
+
+                %s Подписка продлевается с текущим лимитом:
+                <b>%s</b>
+                """, TEXT_CHECK, TEXT_DEVICE, formatDeviceCount(currentMaxDevices));
+        }
+
+        return String.format("""
+            %s <b>Будущий лимит сброшен</b>
+
+            %s Подписка снова будет продлеваться с текущим лимитом:
+            <b>%s</b>
+            """, TEXT_CHECK, TEXT_REFRESH, formatDeviceCount(currentMaxDevices));
     }
 
     public String lucky777Text(boolean canSpin, String remainingText) {
@@ -794,7 +1026,7 @@ public class TextFactory {
         );
     }
 
-    public String hwidDevicesText(List<HwidDevice> hwidDevices) {
+    public String hwidDevicesText(List<HwidDevice> hwidDevices, Integer maxDevices) {
         int count = hwidDevices != null ? hwidDevices.size() : 0;
         int maxUserDevices = Math.max(maxDevices, count);
 

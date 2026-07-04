@@ -4,12 +4,10 @@ import io.nesvpn.subscribelinkservice.client.RemnawaveClient;
 import io.nesvpn.subscribelinkservice.entity.Order;
 import io.nesvpn.subscribelinkservice.entity.Token;
 import io.nesvpn.subscribelinkservice.entity.User;
-import io.nesvpn.subscribelinkservice.entity.VpnPlan;
-import io.nesvpn.subscribelinkservice.enums.OrderOperationType;
 import io.nesvpn.subscribelinkservice.enums.OrderStatus;
 import io.nesvpn.subscribelinkservice.repository.OrderRepository;
 import io.nesvpn.subscribelinkservice.repository.TokenRepository;
-import io.nesvpn.subscribelinkservice.service.UpdateTokenService;
+import io.nesvpn.subscribelinkservice.service.DeviceLimitChangeService;
 import io.nesvpn.subscribelinkservice.service.UtilService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,8 +22,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -35,20 +31,19 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class UpdateTokenServiceTest {
+class DeviceLimitChangeServiceTest {
 
-    @Mock private RemnawaveClient remnawaveClient;
     @Mock private OrderRepository orderRepository;
     @Mock private TokenRepository tokenRepository;
+    @Mock private RemnawaveClient remnawaveClient;
     @Mock private UtilService utilService;
 
     @InjectMocks
-    private UpdateTokenService updateTokenService;
+    private DeviceLimitChangeService deviceLimitChangeService;
 
     private User user;
     private Token token;
     private Order order;
-    private VpnPlan plan;
     private final Long orderId = 1L;
 
     @BeforeEach
@@ -57,47 +52,37 @@ class UpdateTokenServiceTest {
         token = Token.builder()
                 .id(10L)
                 .user(user)
-                .token("old-link")
                 .vpnPanelUserUuid(UUID.fromString("550e8400-e29b-41d4-a716-446655440001"))
-                .validTo(LocalDateTime.now())
-                .maxDevices(3)
-                .renewalTargetMaxDevices(5)
-                .build();
-        plan = VpnPlan.builder()
-                .id(1L)
-                .duration(30)
-                .defaultDevices(3)
+                .validTo(LocalDateTime.now().plusDays(10))
+                .maxDevices(5)
+                .renewalTargetMaxDevices(3)
                 .build();
         order = Order.builder()
                 .id(orderId)
-                .user(user)
                 .token(token)
-                .vpnPlan(plan)
                 .status(OrderStatus.PAID)
-                .operationType(OrderOperationType.SUBSCRIPTION_RENEWAL.name())
-                .targetMaxDevices(5)
+                .targetMaxDevices(8)
                 .build();
     }
 
     @Test
-    void process_ShouldUpdateToken_WhenOrderPaid() {
+    void process_ShouldUpdateDeviceLimit_WhenOrderPaid() {
         when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
         when(tokenRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(token));
         when(utilService.createDescription(user, "tester")).thenReturn("description");
         when(remnawaveClient.updateVpnUser(
                 anyString(),
                 eq(0L),
-                any(LocalDateTime.class),
-                eq(5),
+                eq(token.getValidTo()),
+                eq(8),
                 eq("description")))
                 .thenReturn(Mono.empty());
 
-        String result = updateTokenService.process(orderId, "tester").block();
+        deviceLimitChangeService.process(orderId, "tester").block();
 
-        assertEquals("old-link", result);
-        assertTrue(token.getValidTo().isAfter(LocalDateTime.now()));
-        assertEquals(5, token.getMaxDevices());
+        assertEquals(8, token.getMaxDevices());
         assertEquals(null, token.getRenewalTargetMaxDevices());
+        verify(tokenRepository).save(token);
         verify(orderRepository).save(argThat(savedOrder -> savedOrder.getStatus() == OrderStatus.PROVIDED));
     }
 
@@ -106,22 +91,9 @@ class UpdateTokenServiceTest {
         order.setStatus(OrderStatus.PROVIDED);
         when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
-        String result = updateTokenService.process(orderId, "tester").block();
+        deviceLimitChangeService.process(orderId, "tester").block();
 
-        assertEquals("", result);
         verifyNoInteractions(remnawaveClient, tokenRepository);
-        verify(orderRepository, never()).save(any(Order.class));
-    }
-
-    @Test
-    void process_ShouldReturnEmpty_WhenOrderNotPaid() {
-        order.setStatus(OrderStatus.PENDING);
-        when(orderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
-
-        String result = updateTokenService.process(orderId, "tester").block();
-
-        assertEquals("", result);
-        verifyNoInteractions(remnawaveClient, tokenRepository);
-        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderRepository, never()).save(order);
     }
 }

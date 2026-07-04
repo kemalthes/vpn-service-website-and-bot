@@ -3,6 +3,7 @@ package io.nesvpn.telegrambot.handler.sections;
 import io.nesvpn.telegrambot.dto.lucky777.Lucky777Result;
 import io.nesvpn.telegrambot.dto.lucky777.Lucky777Status;
 import io.nesvpn.telegrambot.enums.BotState;
+import io.nesvpn.telegrambot.handler.common.TelegramDeliveryStatus;
 import io.nesvpn.telegrambot.handler.common.TelegramMessageSender;
 import io.nesvpn.telegrambot.model.TelegramUser;
 import io.nesvpn.telegrambot.model.Token;
@@ -124,8 +125,8 @@ public class Lucky777Handler {
         sender.sendMessage(chatId, textFactory.lucky777InvalidDiceText(), keyboardFactory.getBackButton(), "HTML");
     }
 
-    public boolean showLucky777AvailableNotification(Long chatId) {
-        return sender.trySendMessage(
+    public TelegramDeliveryStatus showLucky777AvailableNotification(Long chatId) {
+        return sender.sendMessageWithStatus(
                 chatId,
                 textFactory.lucky777AvailableNotificationText(),
                 keyboardFactory.getLucky777AvailableNotificationKeyboard(),

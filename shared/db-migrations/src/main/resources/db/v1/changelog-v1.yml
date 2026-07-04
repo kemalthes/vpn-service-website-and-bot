@@ -87,3 +87,9 @@ databaseChangeLog:
   - include:
       file: ddl/20260616-create-subscription-auto-renewal-settings.yml
       relativeToChangelogFile: true
+  - include:
+      file: ddl/20260704-add-subscription-device-limits.yml
+      relativeToChangelogFile: true
+  - include:
+      file: dml/20260704-update-vpn-plan-prices.yml
+      relativeToChangelogFile: true

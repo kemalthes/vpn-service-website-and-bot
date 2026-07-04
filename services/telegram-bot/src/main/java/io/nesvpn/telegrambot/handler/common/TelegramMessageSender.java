@@ -24,6 +24,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 @Slf4j
 @Component
@@ -42,6 +43,10 @@ public class TelegramMessageSender {
     }
 
     public boolean trySendMessage(Long chatId, String text, ReplyKeyboard markup, String parseMode) {
+        return sendMessageWithStatus(chatId, text, markup, parseMode) == TelegramDeliveryStatus.SENT;
+    }
+
+    public TelegramDeliveryStatus sendMessageWithStatus(Long chatId, String text, ReplyKeyboard markup, String parseMode) {
         SendMessage message = new SendMessage();
         message.setChatId(chatId);
         message.setText(text);
@@ -55,10 +60,18 @@ public class TelegramMessageSender {
 
         try {
             vpnBot.execute(message);
-            return true;
+            return TelegramDeliveryStatus.SENT;
         } catch (TelegramApiException e) {
+            if (isRecipientUnavailable(e)) {
+                log.warn(
+                        "Telegram message skipped: recipient unavailable. chatId={}, error={}",
+                        chatId,
+                        formatTelegramError(e)
+                );
+                return TelegramDeliveryStatus.RECIPIENT_UNAVAILABLE;
+            }
             log.error("Telegram API Exception", e);
-            return false;
+            return TelegramDeliveryStatus.FAILED;
         }
     }
 
@@ -75,6 +88,19 @@ public class TelegramMessageSender {
             }
             vpnBot.execute(editMessage);
         } catch (TelegramApiException e) {
+            if (isMessageNotModified(e)) {
+                log.debug("Telegram edit skipped: message is not modified. chatId={}, messageId={}", chatId, messageId);
+                return;
+            }
+            if (isRecipientUnavailable(e)) {
+                log.warn(
+                        "Telegram edit skipped: recipient unavailable. chatId={}, messageId={}, error={}",
+                        chatId,
+                        messageId,
+                        formatTelegramError(e)
+                );
+                return;
+            }
             log.error("Telegram API Exception", e);
         }
     }
@@ -90,6 +116,16 @@ public class TelegramMessageSender {
     }
 
     public boolean tryEditOrSendMessage(
+            Long chatId,
+            Integer messageId,
+            String text,
+            InlineKeyboardMarkup markup,
+            String parseMode
+    ) {
+        return editOrSendMessageWithStatus(chatId, messageId, text, markup, parseMode) == TelegramDeliveryStatus.SENT;
+    }
+
+    public TelegramDeliveryStatus editOrSendMessageWithStatus(
             Long chatId,
             Integer messageId,
             String text,
@@ -119,10 +155,24 @@ public class TelegramMessageSender {
                 sendMessage.disableWebPagePreview();
                 vpnBot.execute(sendMessage);
             }
-            return true;
+            return TelegramDeliveryStatus.SENT;
         } catch (TelegramApiException e) {
+            if (isMessageNotModified(e)) {
+                log.debug("Telegram edit skipped: message is not modified. chatId={}, messageId={}", chatId, messageId);
+                return TelegramDeliveryStatus.SENT;
+            }
+            if (isRecipientUnavailable(e)) {
+                log.warn(
+                        "Telegram {} skipped: recipient unavailable. chatId={}, messageId={}, error={}",
+                        messageId != null ? "edit" : "message",
+                        chatId,
+                        messageId,
+                        formatTelegramError(e)
+                );
+                return TelegramDeliveryStatus.RECIPIENT_UNAVAILABLE;
+            }
             log.error("Telegram API Exception", e);
-            return false;
+            return TelegramDeliveryStatus.FAILED;
         }
     }
 
@@ -251,6 +301,33 @@ public class TelegramMessageSender {
         }
 
         return e.getMessage();
+    }
+
+    private boolean isMessageNotModified(TelegramApiException e) {
+        if (e instanceof TelegramApiRequestException requestException) {
+            String apiResponse = requestException.getApiResponse();
+            return Integer.valueOf(400).equals(requestException.getErrorCode())
+                    && apiResponse != null
+                    && apiResponse.contains("message is not modified");
+        }
+
+        return false;
+    }
+
+    private boolean isRecipientUnavailable(TelegramApiException e) {
+        if (e instanceof TelegramApiRequestException requestException) {
+            String apiResponse = requestException.getApiResponse();
+            String normalizedResponse = apiResponse != null ? apiResponse.toLowerCase(Locale.ROOT) : "";
+            Integer errorCode = requestException.getErrorCode();
+
+            return (Integer.valueOf(400).equals(errorCode) && normalizedResponse.contains("chat not found"))
+                    || (Integer.valueOf(403).equals(errorCode)
+                    && (normalizedResponse.contains("bot was blocked")
+                    || normalizedResponse.contains("user is deactivated")
+                    || normalizedResponse.contains("bot was kicked")));
+        }
+
+        return false;
     }
 
     private void writePart(ByteArrayOutputStream outputStream, String boundary, String name, String value) {

@@ -75,6 +75,8 @@ public class MessageHandler {
                 balancePaymentHandler.handleAmountInput(message);
             } else if (state == BotState.BALANCE_AWAITING_AMOUNT_CRYPTO) {
                 balancePaymentHandler.handleAmountInputCrypto(message);
+            } else if (state == BotState.SUBSCRIPTION_DEVICE_LIMIT_INPUT) {
+                subscriptionHandler.handleDeviceLimitInput(message);
             } else {
                 sender.deleteMessage(message.getChatId(), message.getMessageId());
             }

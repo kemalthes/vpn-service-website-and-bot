@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Column;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -39,8 +41,21 @@ public class Order {
     @JoinColumn(name = "vpn_plan_id")
     private VpnPlan vpnPlan;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "token_id")
+    private Token token;
+
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
+    private String operationType;
+
+    private Integer targetMaxDevices;
+
+    @Column(precision = 12, scale = 0)
+    private BigDecimal totalPrice;
+
     private Instant createdAt;
+
+    private Instant updatedAt;
 }

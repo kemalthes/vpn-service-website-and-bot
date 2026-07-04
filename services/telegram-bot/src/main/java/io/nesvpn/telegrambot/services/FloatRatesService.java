@@ -2,7 +2,9 @@ package io.nesvpn.telegrambot.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -20,12 +22,17 @@ import java.util.concurrent.locks.ReentrantLock;
 public class FloatRatesService {
 
     private static final String FLOAT_RATES_URL = "http://www.floatrates.com/daily/usd.json";
+    private static final int RATE_FETCH_RETRIES = 3;
+    private static final long CACHE_DURATION_MINUTES = 30;
+
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
+    @Value("${project.fallback-usd-to-rub-rate:90}")
+    private double fallbackUsdToRubRate;
+
     private volatile Double cachedRate = null;
     private volatile LocalDateTime lastUpdateTime = null;
-    private static final long CACHE_DURATION_MINUTES = 30;
 
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -34,7 +41,10 @@ public class FloatRatesService {
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
         this.objectMapper = new ObjectMapper();
+    }
 
+    @PostConstruct
+    public void init() {
         refreshRateAsync();
     }
 
@@ -54,19 +64,23 @@ public class FloatRatesService {
 
     private void refreshRateAsync() {
         CompletableFuture.runAsync(() -> {
+            boolean locked = false;
             try {
-                if (lock.tryLock(1, TimeUnit.SECONDS)) {
-                    try {
-                        double newRate = fetchRate();
-                        cachedRate = newRate;
-                        lastUpdateTime = LocalDateTime.now();
-                        log.info("Rate updated asynchronously: {}", newRate);
-                    } finally {
-                        lock.unlock();
-                    }
+                locked = lock.tryLock(1, TimeUnit.SECONDS);
+                if (locked) {
+                    double newRate = fetchRate();
+                    cacheRate(newRate);
+                    log.info("USD/RUB rate updated asynchronously: {}", newRate);
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("USD/RUB rate refresh was interrupted. Using rate: {}", getCachedOrFallbackRate());
             } catch (Exception e) {
-                e.printStackTrace();
+                log.warn("Failed to refresh USD/RUB rate: {}. Using rate: {}", e.getMessage(), getCachedOrFallbackRate());
+            } finally {
+                if (locked) {
+                    lock.unlock();
+                }
             }
         });
     }
@@ -76,14 +90,21 @@ public class FloatRatesService {
             return cachedRate;
         }
 
-        double newRate = fetchRate();
-        cachedRate = newRate;
-        lastUpdateTime = LocalDateTime.now();
-        return newRate;
+        try {
+            double newRate = fetchRate();
+            cacheRate(newRate);
+            return newRate;
+        } catch (Exception e) {
+            double fallbackRate = getCachedOrFallbackRate();
+            cacheRate(fallbackRate);
+            log.warn("Failed to fetch USD/RUB rate: {}. Using fallback rate: {}", e.getMessage(), fallbackRate);
+            return fallbackRate;
+        }
     }
 
     private double fetchRate() {
-        int retries = 3;
+        int retries = RATE_FETCH_RETRIES;
+        Exception lastException = null;
         while (retries-- > 0) {
             try {
                 HttpRequest request = HttpRequest.newBuilder()
@@ -103,12 +124,18 @@ public class FloatRatesService {
                     if (rubNode != null) {
                         return rubNode.get("rate").asDouble();
                     }
+                    lastException = new IllegalStateException("RUB rate is missing in FloatRates response");
+                } else {
+                    lastException = new IllegalStateException("FloatRates returned HTTP " + response.statusCode());
                 }
 
                 Thread.sleep(500);
 
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while fetching USD/RUB rate", e);
             } catch (Exception e) {
-                e.printStackTrace();
+                lastException = e;
             }
         }
 
@@ -116,7 +143,19 @@ public class FloatRatesService {
             return cachedRate;
         }
 
-        throw new RuntimeException("Failed to fetch exchange rate after all retries");
+        throw new IllegalStateException(
+                "Failed to fetch USD/RUB rate after " + RATE_FETCH_RETRIES + " retries",
+                lastException
+        );
+    }
+
+    private void cacheRate(double rate) {
+        cachedRate = rate;
+        lastUpdateTime = LocalDateTime.now();
+    }
+
+    private double getCachedOrFallbackRate() {
+        return cachedRate != null ? cachedRate : fallbackUsdToRubRate;
     }
 
     public void forceRefresh() {

@@ -48,6 +48,10 @@ public class Token {
 
     private UUID vpnPanelUserUuid;
 
+    private Integer maxDevices;
+
+    private Integer renewalTargetMaxDevices;
+
     @Enumerated(EnumType.STRING)
     private TokenStatus status;
 }

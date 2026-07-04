@@ -12,6 +12,8 @@ public interface VpnPlanRepository extends JpaRepository<VpnPlan, Long> {
 
     List<VpnPlan> findAllByOrderByDurationAsc();
 
+    List<VpnPlan> findByPriceGreaterThanAndCountryNotOrderByDurationAsc(Integer price, String country);
+
     List<VpnPlan> findByCountry(String country);
 
     Optional<VpnPlan> findFirstByCountryAndDurationOrderByIdAsc(String country, Integer duration);
