@@ -122,6 +122,8 @@ public class SubscriptionExpirationNotificationService {
                         token.getId(),
                         token.getUserId(),
                         token.getValidTo(),
+                        token.getMaxDevices(),
+                        token.getRenewalTargetMaxDevices(),
                         type
                 ))
                 .toList();

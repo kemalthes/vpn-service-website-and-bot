@@ -22,6 +22,10 @@ public interface TokenRepository extends JpaRepository<Token, Long> {
     Optional<Token> findByUserId(@Param("userId") UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM Token t WHERE t.id = :id")
+    Optional<Token> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT t
             FROM Token t

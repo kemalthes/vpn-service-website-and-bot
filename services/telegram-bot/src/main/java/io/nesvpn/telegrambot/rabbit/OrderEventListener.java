@@ -14,6 +14,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class OrderEventListener {
 
     private final LinkRequestProducer linkRequestProducer;
+    private final DeviceLimitChangeRequestProducer deviceLimitChangeRequestProducer;
     private final VpnBot vpnBot;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -25,6 +26,21 @@ public class OrderEventListener {
                         .userId(event.userId())
                         .orderId(event.orderId())
                         .planId(event.planId())
+                        .tgUsername(username)
+                        .build()
+        );
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDeviceLimitChangePaid(DeviceLimitChangePaidEvent event) {
+        log.info("Транзакция изменения лимита устройств {} успешно завершена. Отправляем в RabbitMQ...", event.orderId());
+        String username = DisplayTelegramUsername.getDisplayName(vpnBot, event.tgId());
+        deviceLimitChangeRequestProducer.sendDeviceLimitChangeTask(
+                DeviceLimitChangeRequest.builder()
+                        .userId(event.userId())
+                        .orderId(event.orderId())
+                        .tokenId(event.tokenId())
+                        .targetMaxDevices(event.targetMaxDevices())
                         .tgUsername(username)
                         .build()
         );

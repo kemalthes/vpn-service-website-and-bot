@@ -20,8 +20,10 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -426,7 +428,8 @@ public class KeyboardFactory {
                     ? Formatter.formatMoscow(device.getCreatedAt().toLocalDateTime(), "dd.MM")
                     : "";
 
-            String deviceClient = device.getUserAgent().toLowerCase().replace(" ", "");
+            String userAgent = device.getUserAgent() != null ? device.getUserAgent() : "";
+            String deviceClient = userAgent.toLowerCase().replace(" ", "");
             String clientText = null;
             if (deviceClient.contains("happ")) {
                 clientText = "Happ";
@@ -454,9 +457,33 @@ public class KeyboardFactory {
 
         List<InlineKeyboardButton> row = new ArrayList<>();
         InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
-        backBtn.setCallbackData("back");
+        backBtn.setCallbackData("subscription_devices");
         row.add(backBtn);
         rows.add(row);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup getSubscriptionDevicesMenuKeyboard() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton changeBtn = inlineButton("Изменить количество устройств", ButtonIcon.DEVICE, STYLE_PRIMARY);
+        changeBtn.setCallbackData("subscription_devices_change");
+        row1.add(changeBtn);
+
+        InlineKeyboardButton deleteBtn = inlineButton("Удалить устройства", ButtonIcon.DELETE);
+        deleteBtn.setCallbackData("subscription_devices_delete");
+        row1.add(deleteBtn);
+        rows.add(row1);
+
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
+        backBtn.setCallbackData("subscription");
+        row2.add(backBtn);
+        rows.add(row2);
 
         markup.setKeyboard(rows);
         return markup;
@@ -679,14 +706,15 @@ public class KeyboardFactory {
     }
 
 
-    public InlineKeyboardMarkup getExtendPlansKeyboard(Long tokenId, List<VpnPlan> plans) {
+    public InlineKeyboardMarkup getExtendPlansKeyboard(Long draftOrderId, List<VpnPlan> plans, Map<Long, BigDecimal> planPrices) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         for (VpnPlan plan : plans) {
             List<InlineKeyboardButton> row = new ArrayList<>();
-            InlineKeyboardButton planBtn = inlineButton(String.format("%s — %d₽", plan.getName(), plan.getPrice()), ButtonIcon.PACKAGE);
-            planBtn.setCallbackData("extend_confirm_" + tokenId + "_" + plan.getId());
+            BigDecimal price = planPrices.getOrDefault(plan.getId(), BigDecimal.valueOf(plan.getPrice()));
+            InlineKeyboardButton planBtn = inlineButton(String.format("%s — %.0f₽", plan.getName(), price), ButtonIcon.PACKAGE);
+            planBtn.setCallbackData("extend_confirm_" + draftOrderId + "_" + plan.getId());
             row.add(planBtn);
             rows.add(row);
         }
@@ -701,19 +729,39 @@ public class KeyboardFactory {
         return markup;
     }
 
-    public InlineKeyboardMarkup getConfirmExtendKeyboard(Long tokenId, Long planId) {
+    public InlineKeyboardMarkup getConfirmExtendKeyboard(Long orderId) {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
         List<InlineKeyboardButton> row1 = new ArrayList<>();
         InlineKeyboardButton confirmBtn = inlineButton("Подтвердить продление", ButtonIcon.SUCCESS, STYLE_SUCCESS);
-        confirmBtn.setCallbackData("extend_process_" + tokenId + "_" + planId);
+        confirmBtn.setCallbackData("extend_process_" + orderId);
         row1.add(confirmBtn);
         rows.add(row1);
 
         List<InlineKeyboardButton> row2 = new ArrayList<>();
         InlineKeyboardButton cancelBtn = inlineButton("Назад", ButtonIcon.BACK);
         cancelBtn.setCallbackData("back");
+        row2.add(cancelBtn);
+        rows.add(row2);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup getConfirmDeviceLimitChangeKeyboard(Long orderId) {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
+        InlineKeyboardButton confirmBtn = inlineButton("Подтвердить", ButtonIcon.SUCCESS, STYLE_SUCCESS);
+        confirmBtn.setCallbackData("device_limit_process_" + orderId);
+        row1.add(confirmBtn);
+        rows.add(row1);
+
+        List<InlineKeyboardButton> row2 = new ArrayList<>();
+        InlineKeyboardButton cancelBtn = inlineButton("Назад", ButtonIcon.BACK);
+        cancelBtn.setCallbackData("subscription_devices");
         row2.add(cancelBtn);
         rows.add(row2);
 
@@ -728,6 +776,20 @@ public class KeyboardFactory {
         List<InlineKeyboardButton> row = new ArrayList<>();
         InlineKeyboardButton backBtn = inlineButton("Назад к подписке", ButtonIcon.BACK);
         backBtn.setCallbackData("subscription");
+        row.add(backBtn);
+        rows.add(row);
+
+        markup.setKeyboard(rows);
+        return markup;
+    }
+
+    public InlineKeyboardMarkup getBackToSubscriptionDevicesKeyboard() {
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        List<InlineKeyboardButton> row = new ArrayList<>();
+        InlineKeyboardButton backBtn = inlineButton("Назад", ButtonIcon.BACK);
+        backBtn.setCallbackData("subscription_devices");
         row.add(backBtn);
         rows.add(row);
 

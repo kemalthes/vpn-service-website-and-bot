@@ -26,14 +26,19 @@ public class BalanceService {
 
     @Transactional
     public void addBalance(UUID userId, BigDecimal amount, TransactionType type, String description) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        user.setBalance(user.getBalance().add(amount));
+        applyBalanceChange(user, amount, type, description);
+    }
+
+    private void applyBalanceChange(User user, BigDecimal amount, TransactionType type, String description) {
+        BigDecimal currentBalance = user.getBalance() != null ? user.getBalance() : BigDecimal.ZERO;
+        user.setBalance(currentBalance.add(amount));
         userRepository.save(user);
 
         BalanceTransaction transaction = new BalanceTransaction();
-        transaction.setUserId(userId);
+        transaction.setUserId(user.getId());
         transaction.setAmount(amount);
         transaction.setType(type);
         transaction.setDescription(description);
@@ -75,7 +80,14 @@ public class BalanceService {
 
     @Transactional
     public void subtractBalance(UUID userId, BigDecimal amount, TransactionType type, String description) {
-        addBalance(userId, amount.negate(), type, description);
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        BigDecimal currentBalance = user.getBalance() != null ? user.getBalance() : BigDecimal.ZERO;
+        if (currentBalance.compareTo(amount) < 0) {
+            throw new NotEnoughBalanceException(amount, currentBalance);
+        }
+
+        applyBalanceChange(user, amount.negate(), type, description);
     }
 
     @Transactional(readOnly = true)

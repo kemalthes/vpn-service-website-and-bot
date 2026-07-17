@@ -32,4 +32,6 @@ public class VpnPlan {
     private Integer duration;
 
     private String country;
+
+    private Integer defaultDevices;
 }

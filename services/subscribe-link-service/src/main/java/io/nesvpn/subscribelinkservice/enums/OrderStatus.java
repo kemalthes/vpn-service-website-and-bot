@@ -2,8 +2,9 @@ package io.nesvpn.subscribelinkservice.enums;
 
 public enum OrderStatus {
 
-    PAID,
-    CANCELED,
+    DRAFT,
     PENDING,
+    PAID,
+    CANCELLED,
     PROVIDED
 }

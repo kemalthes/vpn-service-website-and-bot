@@ -1,7 +1,9 @@
 package io.nesvpn.telegrambot.repository;
 
 import io.nesvpn.telegrambot.model.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,6 +19,10 @@ public interface UserRepository extends JpaRepository<User, String> {
     Optional<User> findByTgId(Long tgId);
 
     Optional<User> findById(UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") UUID id);
 
     List<User> findAllByIdIn(Collection<UUID> id);
 

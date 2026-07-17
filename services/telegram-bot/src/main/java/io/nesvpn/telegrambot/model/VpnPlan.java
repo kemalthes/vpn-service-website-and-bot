@@ -27,6 +27,9 @@ public class VpnPlan {
     @Column(name = "country", nullable = false)
     private String country;
 
+    @Column(name = "default_devices", nullable = false)
+    private Integer defaultDevices;
+
     public String getDisplayName() {
         int months = duration / 30;
         return String.format("%s (%d мес.)", name, months);

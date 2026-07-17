@@ -8,7 +8,12 @@ public record AutoRenewalResult(
         Status status,
         VpnPlan plan,
         BigDecimal balance,
-        BigDecimal balanceAfter
+        BigDecimal balanceAfter,
+        BigDecimal chargedAmount,
+        Integer oldMaxDevices,
+        Integer targetMaxDevices,
+        Integer requestedMaxDevices,
+        boolean deviceLimitFallback
 ) {
 
     public enum Status {

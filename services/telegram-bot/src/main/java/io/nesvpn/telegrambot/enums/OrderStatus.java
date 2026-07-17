@@ -1,7 +1,10 @@
 package io.nesvpn.telegrambot.enums;
 
 public enum OrderStatus {
+    DRAFT("DRAFT"),
+    PENDING("PENDING"),
     PAID("PAID"),
+    CANCELLED("CANCELLED"),
     PROVIDED("PROVIDED");
 
     private final String value;

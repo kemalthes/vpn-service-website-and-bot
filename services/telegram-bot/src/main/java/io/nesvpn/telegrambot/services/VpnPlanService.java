@@ -14,12 +14,16 @@ import java.util.Optional;
 @Transactional
 public class VpnPlanService {
     private static final Long ONE_MONTH_PLAN_ID = 1L;
+    private static final String BONUS_COUNTRY = "Bonus";
 
     private final VpnPlanRepository vpnPlanRepository;
 
     public List<VpnPlan> getAllPlans() {
-        List<VpnPlan> plans =  vpnPlanRepository.findAllByOrderByDurationAsc();
-        return plans.stream().filter(c -> c.getPrice() > 0).toList();
+        return getPurchasableSubscriptionPlans();
+    }
+
+    public List<VpnPlan> getPurchasableSubscriptionPlans() {
+        return vpnPlanRepository.findByPriceGreaterThanAndCountryNotOrderByDurationAsc(0, BONUS_COUNTRY);
     }
 
     public List<VpnPlan> getPlansByCountry(String country) {
@@ -35,6 +39,6 @@ public class VpnPlanService {
     }
 
     public Optional<VpnPlan> findLucky777Plan(Integer duration) {
-        return vpnPlanRepository.findFirstByCountryAndDurationOrderByIdAsc("Bonus", duration);
+        return vpnPlanRepository.findFirstByCountryAndDurationOrderByIdAsc(BONUS_COUNTRY, duration);
     }
 }

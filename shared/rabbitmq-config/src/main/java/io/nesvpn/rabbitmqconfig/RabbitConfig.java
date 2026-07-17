@@ -27,6 +27,9 @@ public class RabbitConfig {
     public static final String ROUTING_KEY_DLX = "dlx.link.request";
     public static final String ROUTING_KEY_FAILED = "link.request.failed";
     public static final String ROUTING_KEY_HWID_REQUEST = "hwid.request";
+    public static final String ROUTING_KEY_DEVICE_LIMIT_CHANGE_REQUEST = "device-limit.change.request";
+    public static final String ROUTING_KEY_DEVICE_LIMIT_CHANGE_DLX = "dlx.device-limit.change.request";
+    public static final String ROUTING_KEY_DEVICE_LIMIT_CHANGE_FAILED = "device-limit.change.request.failed";
 
     @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
@@ -93,6 +96,28 @@ public class RabbitConfig {
     }
 
     @Bean
+    public Queue deviceLimitChangeRequestQueue() {
+        return QueueBuilder.durable(ROUTING_KEY_DEVICE_LIMIT_CHANGE_REQUEST)
+                .withArgument("x-dead-letter-exchange", DLX_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ROUTING_KEY_DEVICE_LIMIT_CHANGE_DLX)
+                .build();
+    }
+
+    @Bean
+    public Queue dlqDeviceLimitChangeRequestQueue() {
+        return QueueBuilder.durable("dlq.device-limit.change.request")
+                .withArgument("x-message-ttl", 30000)
+                .withArgument("x-dead-letter-exchange", EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", ROUTING_KEY_DEVICE_LIMIT_CHANGE_REQUEST)
+                .build();
+    }
+
+    @Bean
+    public Queue failedDeviceLimitChangeRequestQueue() {
+        return QueueBuilder.durable("failed.device-limit.change.request").build();
+    }
+
+    @Bean
     public Binding linkRequestBinding() {
         return BindingBuilder.bind(linkRequestQueue()).to(linkExchange()).with(ROUTING_KEY_REQUEST);
     }
@@ -110,5 +135,20 @@ public class RabbitConfig {
     @Bean
     public Binding hwidRequestBinding() {
         return BindingBuilder.bind(hwidRequestQueue()).to(linkExchange()).with(ROUTING_KEY_HWID_REQUEST);
+    }
+
+    @Bean
+    public Binding deviceLimitChangeRequestBinding() {
+        return BindingBuilder.bind(deviceLimitChangeRequestQueue()).to(linkExchange()).with(ROUTING_KEY_DEVICE_LIMIT_CHANGE_REQUEST);
+    }
+
+    @Bean
+    public Binding dlqDeviceLimitChangeRequestBinding() {
+        return BindingBuilder.bind(dlqDeviceLimitChangeRequestQueue()).to(dlxExchange()).with(ROUTING_KEY_DEVICE_LIMIT_CHANGE_DLX);
+    }
+
+    @Bean
+    public Binding failedDeviceLimitChangeRequestBinding() {
+        return BindingBuilder.bind(failedDeviceLimitChangeRequestQueue()).to(dlxExchange()).with(ROUTING_KEY_DEVICE_LIMIT_CHANGE_FAILED);
     }
 }

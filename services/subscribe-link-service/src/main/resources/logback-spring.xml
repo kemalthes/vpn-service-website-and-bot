@@ -3,25 +3,31 @@
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
     <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
     <springProperty scope="context" name="appName" source="spring.application.name"/>
+    <property name="LOKI_URL" value="${LOKI_URL:-http://localhost:3100/loki/api/v1/push}"/>
 
-    <springProfile name="local">
-        <property name="LOKI_URL" value="http://localhost:3100/loki/api/v1/push"/>
-    </springProfile>
     <springProfile name="docker">
-        <property name="LOKI_URL" value="http://loki:3100/loki/api/v1/push"/>
+        <property name="LOKI_URL" value="${LOKI_URL:-http://loki:3100/loki/api/v1/push}"/>
     </springProfile>
 
-    <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
-        <http><url>${LOKI_URL}</url></http>
-        <format>
-            <label><pattern>app=${appName},level=%level</pattern></label>
-            <message><pattern>${CONSOLE_LOG_PATTERN}</pattern></message>
-            <sortByTime>true</sortByTime>
-        </format>
-    </appender>
+    <springProfile name="loki">
+        <appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+            <http><url>${LOKI_URL}</url></http>
+            <format>
+                <label><pattern>app=${appName},level=%level</pattern></label>
+                <message><pattern>${CONSOLE_LOG_PATTERN}</pattern></message>
+                <sortByTime>true</sortByTime>
+            </format>
+        </appender>
 
-    <root level="INFO">
-        <appender-ref ref="CONSOLE" />
-        <appender-ref ref="LOKI" />
-    </root>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="LOKI"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="!loki">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
 </configuration>

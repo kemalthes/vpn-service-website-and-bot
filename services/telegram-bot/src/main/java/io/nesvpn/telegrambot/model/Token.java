@@ -32,6 +32,12 @@ public class Token {
     @Column(name = "user_id")
     private UUID userId;
 
+    @Column(name = "max_devices", nullable = false)
+    private Integer maxDevices;
+
+    @Column(name = "renewal_target_max_devices")
+    private Integer renewalTargetMaxDevices;
+
     private UUID vpnPanelUserUuid;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -39,6 +45,6 @@ public class Token {
     private User user;
 
     public boolean isActive() {
-        return "active".equals(status.toLowerCase()) && validTo != null && validTo.isAfter(LocalDateTime.now());
+        return "active".equalsIgnoreCase(status) && validTo != null && validTo.isAfter(LocalDateTime.now());
     }
 }
